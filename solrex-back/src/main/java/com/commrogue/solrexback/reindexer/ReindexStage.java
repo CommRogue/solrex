@@ -9,4 +9,5 @@ import java.time.LocalDateTime;
 public class ReindexStage {
     private final LocalDateTime startDate;
     private final LocalDateTime endDate;
+
 }

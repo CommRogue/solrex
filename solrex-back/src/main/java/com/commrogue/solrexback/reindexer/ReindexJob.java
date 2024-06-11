@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -27,14 +28,14 @@ public class ReindexJob {
     private final int numStages;
 
     @Getter(lazy = true)
-    private final HashSet<ReindexStage> stages = generateStages();
+    private final LinkedHashSet<ReindexStage> stages = generateStages();
 
-    private HashSet<ReindexStage> generateStages() {
+    private LinkedHashSet<ReindexStage> generateStages() {
         Duration stageDuration = Duration.between(start, end).dividedBy(numStages);
 
         return IntStream.range(0, numStages).mapToObj(
                         (stageIndex) -> new ReindexStage(start.plus(stageDuration.multipliedBy(stageIndex)),
                                 start.plus(stageDuration.multipliedBy(stageIndex + 1))))
-                .collect(Collectors.toCollection(HashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }
