@@ -1,0 +1,25 @@
+package com.commrogue.solrexback.reindexer;
+
+import com.commrogue.solrexback.common.Collection;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(MockitoExtension.class)
+class ReindexJobTest {
+    @Mock
+    Collection testCollection;
+
+    @Test
+    void getStages_unevenlyDivisible() {
+        ReindexJob reindexJob = new ReindexJob(LocalDateTime.of(2024, 1, 1, 0, 0, 0), LocalDateTime.of(2024, 1, 2, 0, 0, 0), testCollection, testCollection, 5);
+
+        var s = reindexJob.getStages();
+    }
+}

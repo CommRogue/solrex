@@ -1,0 +1,79 @@
+openapi: 3.0.0
+info:
+  title: Solrex API
+  description: |-
+    Solrex is an administration toolkit and interface for managing large-scale Apache Solr™ SolrCloud clusters.
+
+  contact:
+    email: apiteam@swagger.io
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+servers:
+  - url: https://petstore3.swagger.io/api/v3
+tags:
+  - name: Reindex
+    description: Advanced reindexing utilities
+    externalDocs:
+      description: Find out more
+      url: http://swagger.io
+paths:
+  /reindex:
+    post:
+      tags:
+        - Reindex
+      summary: Reindex from source to target collections
+      description: Reindex from source to target collections while specifying staging and sharding configurations
+      operationId: reindex
+      requestBody:
+        description: Specify reindexing parameters.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReindexSpecification'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/ReindexSpecification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReindexSpecification'
+        required: true
+      responses:
+        '200':
+          description: Started reindexing successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Started reindexing successfully"
+        400:
+          description: Bad request format
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    ReindexSpecification:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        staging:
+          type: object
+          anyOf:
+            - $ref: '#/components/schemas/EvenStagingFormat'
+        sharding:
+          type: string
+    EvenStagingFormat:
+      type: object
+      properties:
+        stages_amount:
+          type: integer
+          description: amount of parts to split the entire reindex date range into. each part will be executed as a singular reindexing stage.
+          example: 20
