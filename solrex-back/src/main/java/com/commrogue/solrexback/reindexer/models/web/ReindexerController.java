@@ -1,5 +1,6 @@
 package com.commrogue.solrexback.reindexer.models.web;
 
+import com.commrogue.solrexback.reindexer.ReindexJob;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequiredArgsConstructor
@@ -44,7 +46,8 @@ public class ReindexerController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Specified end date must be after start date");
         }
 
-
+        ReindexJob reindexJob = reindexerService.reindex(reindexSpecification);
+        reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
 
         return Mono.just("sd");
     }
