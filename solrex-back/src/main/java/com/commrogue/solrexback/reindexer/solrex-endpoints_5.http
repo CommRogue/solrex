@@ -1,0 +1,17 @@
+###
+POST http://localhost:8080/reindex/
+Content-Type: application/json
+
+{
+  "srcCollection": {
+    "collectionName": "ew",
+    "zkConnectionString": "ewew"
+  },
+  "dstCollection": {
+    "collectionName": "ew",
+    "zkConnectionString": "ewew"
+  },
+  "startDate": "2024-01-01T00:00:00Z", 
+  "endDate": "2024-02-01T00:00:00Z", 
+  "stagingAmount": 2
+}

@@ -1,6 +1,7 @@
-package com.commrogue.solrexback.reindexer.models.web;
+package com.commrogue.solrexback.reindexer.web;
 
-import com.commrogue.solrexback.reindexer.ReindexJob;
+import com.commrogue.solrexback.reindexer.reactive.ReindexJob;
+import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,7 +49,8 @@ public class ReindexerController {
 
         ReindexJob reindexJob = reindexerService.reindex(reindexSpecification);
         reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
-
-        return Mono.just("sd");
+        // print current thread
+        System.out.println(Thread.currentThread().getName());
+        return Mono.just("sddzs");
     }
 }

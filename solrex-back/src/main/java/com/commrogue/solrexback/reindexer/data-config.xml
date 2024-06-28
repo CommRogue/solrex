@@ -1,0 +1,8 @@
+<dataConfig>
+    <document>
+        <entity name="sep" processor="SolrEntityProcessor"
+                url="http://slr-1:8983/solr/xax_shard1_replica_n1"
+                query="*:*"
+                fl="*,ignored_version_l:_version_"/>
+    </document>
+</dataConfig>

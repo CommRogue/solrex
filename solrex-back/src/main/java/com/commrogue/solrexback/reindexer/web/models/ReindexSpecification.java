@@ -1,4 +1,4 @@
-package com.commrogue.solrexback.reindexer.models.web;
+package com.commrogue.solrexback.reindexer.web.models;
 
 import com.commrogue.solrexback.common.Collection;
 import io.swagger.v3.oas.annotations.media.Schema;
