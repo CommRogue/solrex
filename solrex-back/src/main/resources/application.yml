@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: solrex-back
+reindexer:
+  dataimport-rh: /dataimport
