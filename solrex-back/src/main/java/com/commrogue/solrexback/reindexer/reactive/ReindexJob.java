@@ -42,7 +42,7 @@ public class ReindexJob {
     private final Queue<ReindexStage> stages = generateStages();
 
     @Getter(lazy = true)
-    private final ShardMapping shardMapping = getShardMapping();
+    private final ShardMapping shardMapping = mapShards();
 
     public Queue<ReindexStage> generateStages() {
         Duration stageDuration = Duration.between(reindexSpecification.getStartDate(), reindexSpecification.getEndDate()).dividedBy(reindexSpecification.getStagingAmount());
@@ -53,8 +53,9 @@ public class ReindexJob {
                 .collect(Collectors.toCollection(() -> new PriorityQueue<>(Comparator.comparing(ReindexStage::getStartTime))));
     }
 
-    public ShardMapping getShardMapping() {
+    public ShardMapping mapShards() {
         // TODO - add exception handling for unknown collections
+        // TODO - getClusterState() is blocking
         DocCollection sourceCollection = getCloudSolrClientFromZk(reindexSpecification.getSrcCollection().getZkConnectionString()).getClusterState().getCollection(reindexSpecification.getSrcCollection().getCollectionName());
         DocCollection destinationCollection = getCloudSolrClientFromZk(reindexSpecification.getDstCollection().getZkConnectionString()).getClusterState().getCollection(reindexSpecification.getSrcCollection().getCollectionName());
 
