@@ -2,6 +2,7 @@ package com.commrogue.solrexback.reindexer.reactive;
 
 
 import com.commrogue.solrexback.common.Collection;
+import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import jakarta.validation.Valid;
 import lombok.Getter;
@@ -60,7 +61,7 @@ public class ReindexJob {
                                 .withEndTime(
                                         reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex + 1)))
                                 .withIsNatNetworking(reindexSpecification.isNatNetworking())
-                                .withLinearSharding(sourceCollection, destinationCollection).build())
+                                .withCustomSharding(NonLinearAutomaticSharding.getShardMapping(sourceCollection, destinationCollection)).build())
                 .collect(Collectors.toCollection(
                         () -> new PriorityQueue<>(Comparator.comparing(Reindex::getStartTime))));
     }

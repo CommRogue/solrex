@@ -29,7 +29,7 @@ public class DataImportRequest {
     private final SolrQuery dataImportRequest = new SolrQuery();
     private final SolrQuery statusRequest = new SolrQuery();
 
-    void init() {
+    private void init() {
         dataImportRequest.set("qt", "/dataimport");
         dataImportRequest.set("internalDih", diRequestHandler);
         dataImportRequest.set("command", "full-import");
@@ -90,16 +90,27 @@ public class DataImportRequest {
         return builder(JavaAsyncSolrClient.create(destinationSolrUrl), sourceSolrUrl);
     }
 
+    public static Mono<QueryResponse> makeRequestAndLog(JavaAsyncSolrClient destinationClient, SolrQuery request) {
+        log.debug("Sending SolrQuery to {} - {}", destinationClient,
+                request);
+
+        return Mono.fromCompletionStage(destinationClient.query(request));
+    }
+
     public Flux<Integer> getSubscribable() {
-        return Mono.defer(() -> Mono.fromCompletionStage(this.destinationClient.query(statusRequest))
+        return Mono.defer(() -> makeRequestAndLog(destinationClient, statusRequest)
                         .map(DataImportRequest::extractStatus
                         ).doOnNext((status) -> {
                             if (status.equals("busy")) {
                                 throw new OngoingDataImportException("A DataImport request is already in progress");
                             }
-                        }).then(Mono.defer(() -> Mono.fromCompletionStage(this.destinationClient.query(dataImportRequest)))))
+                        }).then(Mono.defer(() -> {
+                            log.debug("Sending DataImport request to {} - {}", this.sourceSolrUrl,
+                                    dataImportRequest);
+                            return makeRequestAndLog(destinationClient, dataImportRequest);
+                        })))
                 .thenMany(observeShardReindex(Mono.defer(() ->
-                        Mono.fromCompletionStage(this.destinationClient.query(statusRequest)))));
+                        makeRequestAndLog(destinationClient, dataImportRequest))));
 //        return Mono.just(1).doOnNext((x) -> log.info("%s to %s".formatted(this.sourceSolrUrl,
 //                this.destinationClient.toString()))).thenMany((Flux.defer(() -> Flux.interval(Duration.ofSeconds(
 //                ThreadLocalRandom.current().nextLong(1, 5))).take(3))).map((x) -> (int)x.longValue()));

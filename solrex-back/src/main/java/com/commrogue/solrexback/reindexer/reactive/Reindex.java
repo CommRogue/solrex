@@ -2,6 +2,7 @@ package com.commrogue.solrexback.reindexer.reactive;
 
 import com.commrogue.solrexback.common.SolrCoreGatewayInformation;
 import com.commrogue.solrexback.reindexer.exceptions.OngoingDataImportException;
+import com.commrogue.solrexback.reindexer.reactive.sharding.ShardingStrategy;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
@@ -14,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Builder(setterPrefix = "with")
@@ -63,21 +65,9 @@ public class Reindex {
             return this;
         }
 
-        private SolrCoreGatewayInformation getLeaderUrlForShardSlice(Slice shardSlice) {
-            var coreUrl = shardSlice.getLeader().getCoreUrl();
-
-            return new SolrCoreGatewayInformation(coreUrl, isNatNetworking ? coreUrl.replaceFirst("192\\.168\\.\\d+\\" +
-                            ".\\d+",
-                    "localhost") : coreUrl);
-        }
-
-        public ReindexBuilder withLinearSharding(DocCollection sourceCollection,
-                                                 DocCollection destinationCollection) {
-            this.reindexState = new ReindexState(destinationCollection.getActiveSlices().stream().collect(
-                    Collectors.toMap(
-                            (this::getLeaderUrlForShardSlice),
-                            (slice -> Map.of(getLeaderUrlForShardSlice(sourceCollection.getSlice(slice.getName())), 0))
-                    )));
+        public ReindexBuilder withCustomSharding(Map<Slice, ? extends Set<Slice>> shardMapping) {
+            // TODO - isNatNetworking not respected if comes after withCustomSharding in builder
+            this.reindexState = ReindexState.fromSliceMapping(shardMapping, isNatNetworking);
 
             return this;
         }
