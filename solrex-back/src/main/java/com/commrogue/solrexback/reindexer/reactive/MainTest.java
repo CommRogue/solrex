@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import reactor.core.Disposable;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -37,6 +38,11 @@ public class MainTest implements ApplicationRunner {
                 new ReindexJob(LocalDateTime.of(2024, 1, 1, 0, 0, 0), LocalDateTime.of(2024, 1, 2, 0, 0, 0),
                         new Collection("localhost:2181", "xax"), new Collection("localhost:2182", "products"), 5,
                         diRequestHandler, isNatNetworking);
-        reindexJob.run().subscribeOn(Schedulers.immediate()).subscribe();
+        Disposable disposable = reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+        // sleep 5 seconds
+        Thread.sleep(5000);
+
+        disposable.dispose();
     }
 }

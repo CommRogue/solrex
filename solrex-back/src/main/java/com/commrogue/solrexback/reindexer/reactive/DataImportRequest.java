@@ -11,6 +11,7 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -28,6 +29,7 @@ public class DataImportRequest {
 
     private final SolrQuery dataImportRequest = new SolrQuery();
     private final SolrQuery statusRequest = new SolrQuery();
+    private final SolrQuery cancelRequest = new SolrQuery();
 
     private void init() {
         dataImportRequest.set("qt", "/dataimport");
@@ -38,6 +40,8 @@ public class DataImportRequest {
         dataImportRequest.set("fq", constructDataImportFqsParam(fqs));
         statusRequest.set("qt", "/dataimport");
         statusRequest.set("command", "status");
+        cancelRequest.set("qt", "/dataimport");
+        cancelRequest.set("command", "abort");
     }
 
     private static String constructDataImportFqsParam(List<String> fqs) {
@@ -91,7 +95,7 @@ public class DataImportRequest {
     }
 
     public static Mono<QueryResponse> makeRequestAndLog(JavaAsyncSolrClient destinationClient, SolrQuery request) {
-        log.debug("Sending SolrQuery to {} - {}", destinationClient,
+        log.info("Sending SolrQuery to {} - {}", destinationClient,
                 request);
 
         return Mono.fromCompletionStage(destinationClient.query(request));
@@ -110,7 +114,9 @@ public class DataImportRequest {
                             return makeRequestAndLog(destinationClient, dataImportRequest);
                         })))
                 .thenMany(observeShardReindex(Mono.defer(() ->
-                        makeRequestAndLog(destinationClient, dataImportRequest))));
+                        makeRequestAndLog(destinationClient, statusRequest))))
+                .doOnCancel(() -> makeRequestAndLog(destinationClient, cancelRequest).subscribeOn(
+                        Schedulers.boundedElastic()).subscribe());
 //        return Mono.just(1).doOnNext((x) -> log.info("%s to %s".formatted(this.sourceSolrUrl,
 //                this.destinationClient.toString()))).thenMany((Flux.defer(() -> Flux.interval(Duration.ofSeconds(
 //                ThreadLocalRandom.current().nextLong(1, 5))).take(3))).map((x) -> (int)x.longValue()));
