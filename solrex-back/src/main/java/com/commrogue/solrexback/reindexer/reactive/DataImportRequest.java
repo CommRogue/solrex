@@ -54,7 +54,7 @@ public class DataImportRequest {
     }
 
     private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
-        return statusObservable.repeat().delayElements(Duration.ofSeconds(2)).takeUntil(response -> extractStatus(response).equals("idle")).map(
+        return statusObservable.repeatWhen((status) -> status.delayElements(Duration.ofSeconds(2))).takeUntil(response -> extractStatus(response).equals("idle")).map(
                 DataImportRequest::extractNumIndexed);
     }
 
