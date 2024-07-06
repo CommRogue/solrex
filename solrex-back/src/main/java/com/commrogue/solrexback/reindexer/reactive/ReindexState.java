@@ -1,14 +1,14 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
-import io.ino.solrs.JavaAsyncSolrClient;
+import com.commrogue.solrexback.common.SolrCoreGatewayInformation;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReindexState extends HashMap<String, Map<String, Integer>> {
+public class ReindexState extends HashMap<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, Integer>> {
     public int totalIndexed;
 
-    public ReindexState(Map<String, Map<String, Integer>> shardMapping) {
+    public ReindexState(Map<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, Integer>> shardMapping) {
         super(shardMapping);
     }
 }

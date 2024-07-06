@@ -1,12 +1,12 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
+import com.commrogue.solrexback.common.SolrCoreGatewayInformation;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Slice;
-import org.springframework.beans.factory.annotation.Value;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -30,8 +30,8 @@ public class Reindex {
     public Mono<Void> getSubscribable() {
         return Flux.fromIterable(reindexState.entrySet())
                 .flatMap((entry) -> Flux.fromIterable(entry.getValue().entrySet()).concatMap(
-                        (sourceEntry) -> DataImportRequest.builder(entry.getKey(),
-                                        sourceEntry.getKey()).withFqs(fqs).build()
+                        (sourceEntry) -> DataImportRequest.builder(entry.getKey().getExternalAddress(),
+                                        sourceEntry.getKey().getInternalAddress()).withFqs(fqs).build()
                                 .getSubscribable().doOnNext((progress) -> log.info(
                                         "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress))
                                 .doOnComplete(
@@ -59,10 +59,12 @@ public class Reindex {
             return this;
         }
 
-        private String getLeaderUrlForShardSlice(Slice shardSlice) {
+        private SolrCoreGatewayInformation getLeaderUrlForShardSlice(Slice shardSlice) {
             var coreUrl = shardSlice.getLeader().getCoreUrl();
 
-            return isNatNetworking ? coreUrl.replaceFirst("192\\.168\\.\\d+\\.\\d+", "localhost") : coreUrl;
+            return new SolrCoreGatewayInformation(coreUrl, isNatNetworking ? coreUrl.replaceFirst("192\\.168\\.\\d+\\" +
+                            ".\\d+",
+                    "localhost") : coreUrl);
         }
 
         public ReindexBuilder withLinearSharding(DocCollection sourceCollection,
