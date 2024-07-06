@@ -1,13 +1,11 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
-import com.commrogue.solrexback.common.SolrCoreGatewayInformation;
 import com.commrogue.solrexback.reindexer.exceptions.OngoingDataImportException;
-import com.commrogue.solrexback.reindexer.reactive.sharding.ShardingStrategy;
+import com.commrogue.solrexback.reindexer.reactive.models.ReindexState;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Slice;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -16,12 +14,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Builder(setterPrefix = "with")
 @Getter
 @Slf4j
 public class Reindex {
+    private final String timestampField;
     private final LocalDateTime startTime;
     private final LocalDateTime endTime;
     private String diRequestHandler;
@@ -35,26 +33,28 @@ public class Reindex {
                 .flatMap((entry) -> Flux.fromIterable(entry.getValue().entrySet()).concatMap(
                                 (sourceEntry) -> DataImportRequest.builder(entry.getKey().getExternalAddress(),
                                                 sourceEntry.getKey().getInternalAddress()).withFqs(fqs).build()
-                                        .getSubscribable().doOnNext((progress) -> log.info(
-                                                "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress))
+                                        .getSubscribable().doOnSubscribe((_) -> {
+                                            log.info("Sub-Reindex for {} started"
+                                                    , entry.getKey());
+                                            sourceEntry.getValue().setStarted(LocalDateTime.now());
+                                        }).doOnNext((progress) -> {
+                                            log.info(
+                                                    "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress);
+                                            sourceEntry.getValue().setIndexed(progress);
+                                        })
                                         .doOnComplete(
-                                                () -> log.info("Sub-Reindex for {} complete", sourceEntry.getKey()))
-                                        .doOnError((e) -> e instanceof OngoingDataImportException, (e) -> log.warn("A" +
+                                                () -> {
+                                                    log.info("Sub-Reindex for {} complete", sourceEntry.getKey());
+                                                    sourceEntry.getValue().setFinished(LocalDateTime.now());
+                                                })
+                                        .doOnError((e) -> e instanceof OngoingDataImportException, (_) -> log.warn("A" +
                                                 " reindex is already in progress for {}", sourceEntry.getKey())))
+                        .doOnCancel(() -> log.info("Reindex cancelled for {}", entry.getKey()))
                         .doOnComplete(() -> log.info("Reindex complete for {}", entry.getKey()))).then();
+    }
 
-
-//        return this.shardMapping.entrySet().stream().reduce(Flux.<Void>empty(), (stageMono, entry) ->
-//                stageMono.mergeWith(
-//                        entry.getValue().entrySet().stream().reduce(Flux.<Void>empty(), (destShardMono, sourceEntry) ->
-//                                destShardMono.concatWith(Mono.defer(
-//                                                () -> Mono.fromCompletionStage(entry.getKey().query(dataImportRequest)))
-//                                        .then(observeShardReindex(Mono.defer(() -> Mono.fromCompletionStage(
-//                                                entry.getKey().query(dataImportRequest)))).doOnNext(
-//                                                sourceEntry::setValue).then())
-//                                ), Flux::concatWith).then()
-//                ), Flux::mergeWith).then();
-//    }
+    public static PostBuilder builder() {
+        return new PostBuilder();
     }
 
     public static class ReindexBuilder {
@@ -70,6 +70,33 @@ public class Reindex {
             this.reindexState = ReindexState.fromSliceMapping(shardMapping, isNatNetworking);
 
             return this;
+        }
+
+        public ReindexBuilder withStartTime(LocalDateTime startTime) {
+            this.startTime = startTime;
+
+            return this.withFq("timestamp:[%s TO *]" .formatted(startTime));
+        }
+
+        public ReindexBuilder withEndTime(LocalDateTime endTime) {
+            this.endTime = endTime;
+
+            return this.withFq("timestamp:[* TO %s]" .formatted(endTime));
+        }
+    }
+
+    public static class PostBuilder extends ReindexBuilder {
+        @Override
+        public Reindex build() {
+            Reindex reindex = super.build();
+
+            if (reindex.getTimestampField() == null &&
+                    (reindex.getStartTime() != null || reindex.getEndTime() != null)) {
+                throw new IllegalArgumentException("A start or end time has been specified for the reindex but no " +
+                        "timestamp field was specified");
+            }
+
+            return reindex;
         }
     }
 }

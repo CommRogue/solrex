@@ -1,27 +1,26 @@
 package com.commrogue.solrexback.reindexer.web;
 
-import com.commrogue.solrexback.reindexer.reactive.ReindexJob;
+import com.commrogue.solrexback.common.jobmanager.JobManager;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/reindex")
 public class ReindexerController {
     private final ReindexerService reindexerService;
+    private final JobManager jobManager;
 
     @Operation(
             operationId = "reindex",
@@ -36,21 +35,28 @@ public class ReindexerController {
                     })
             }
     )
-    @RequestMapping(
-            method = RequestMethod.POST,
-            value = "/",
-            produces = {"text/plain"},
-            consumes = {"application/json", "application/xml", "application/x-www-form-urlencoded"}
-    )
-    public Mono<String> reindex(@RequestBody @Valid ReindexSpecification reindexSpecification) {
+    @RequestMapping(method = RequestMethod.POST, value = "/")
+    public Mono<String> reindex(@RequestBody ReindexSpecification reindexSpecification) {
         if (!reindexSpecification.getEndDate().isAfter(reindexSpecification.getStartDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Specified end date must be after start date");
         }
 
-        ReindexJob reindexJob = reindexerService.reindex(reindexSpecification);
-        reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
-        // print current thread
-        System.out.println(Thread.currentThread().getName());
-        return Mono.just("sddzs");
+        UUID reindexUUID = this.reindexerService.reindex(reindexSpecification);
+
+        return Mono.just(reindexUUID.toString());
+    }
+
+    @Operation(tags = {"Reindex"})
+    @RequestMapping(method = RequestMethod.GET, value = "/status/{uuid}")
+    public Mono<String> checkStatus(@PathVariable String uuid) {
+        return Mono.just(this.jobManager.getJob(UUID.fromString(uuid)).getState().toString());
+    }
+
+    @Operation(tags = {"Reindex"})
+    @RequestMapping(method = RequestMethod.GET, value = "/abort/{uuid}")
+    public Mono<String> abort(@PathVariable String uuid) {
+        this.jobManager.getJob(UUID.fromString(uuid)).terminate();
+
+        return Mono.just("Aborted %s" .formatted(uuid));
     }
 }

@@ -10,3 +10,6 @@ server:
 logging:
   level:
     root: info
+springdoc:
+  swagger-ui:
+    use-root-path: true

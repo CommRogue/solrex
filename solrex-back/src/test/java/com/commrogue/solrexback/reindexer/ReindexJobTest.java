@@ -18,7 +18,10 @@ class ReindexJobTest {
 
     @Test
     void getStages_unevenlyDivisible() {
-        ReindexJob reindexJob = new ReindexJob(LocalDateTime.of(2024, 1, 1, 0, 0, 0), LocalDateTime.of(2024, 1, 2, 0, 0, 0), testCollection, testCollection, 5, "/dih", true);
+        ReindexJob reindexJob =
+                new ReindexJob("bank_date", LocalDateTime.of(2024, 1, 1, 0, 0, 0),
+                        LocalDateTime.of(2024, 1, 2, 0, 0, 0),
+                        testCollection, testCollection, 5, "/dih", true);
 
         var s = reindexJob.generateStages();
         assertEquals(5, s.size());

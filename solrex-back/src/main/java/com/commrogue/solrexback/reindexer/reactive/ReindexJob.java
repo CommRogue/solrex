@@ -2,6 +2,7 @@ package com.commrogue.solrexback.reindexer.reactive;
 
 
 import com.commrogue.solrexback.common.Collection;
+import com.commrogue.solrexback.common.jobmanager.StatefulJob;
 import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import jakarta.validation.Valid;
@@ -10,8 +11,10 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.solr.common.cloud.DocCollection;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -22,26 +25,30 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.commrogue.solrexback.reindexer.reactive.Helpers.getCloudSolrClientFromZk;
+import static com.commrogue.solrexback.reindexer.Helpers.getCloudSolrClientFromZk;
 
 @RequiredArgsConstructor
 @Valid
 @Slf4j
-public class ReindexJob {
+public class ReindexJob implements StatefulJob {
+    private Disposable jobDisposable;
+    private boolean finished;
     @NonNull
     private final ReindexSpecification reindexSpecification;
     @Getter
     private final AtomicReference<Reindex> currentStage = new AtomicReference<>();
 
-    public ReindexJob(LocalDateTime startDate, LocalDateTime endDate, Collection srcCollection,
+    public ReindexJob(String timestampField, LocalDateTime startDate, LocalDateTime endDate, Collection srcCollection,
                       Collection dstCollection, int stagingAmount, String diRequestHandler, boolean isNatNetworking) {
         this.reindexSpecification =
-                new ReindexSpecification(srcCollection, dstCollection, startDate, endDate, stagingAmount,
-                        diRequestHandler, isNatNetworking);
+                ReindexSpecification.builder().withTimestampField(timestampField).withStartDate(startDate)
+                        .withEndDate(endDate).withSrcCollection(srcCollection).withDstCollection(dstCollection)
+                        .withStagingAmount(stagingAmount).withDiRequestHandler(diRequestHandler)
+                        .withIsNatNetworking(isNatNetworking).build();
     }
 
     @Getter(lazy = true)
-    private final Queue<Reindex> stages = generateStages();
+    private final Queue<Reindex> remainingStages = generateStages();
 
     public Queue<Reindex> generateStages() {
         DocCollection sourceCollection = getCloudSolrClientFromZk(
@@ -61,14 +68,17 @@ public class ReindexJob {
                                 .withEndTime(
                                         reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex + 1)))
                                 .withIsNatNetworking(reindexSpecification.isNatNetworking())
-                                .withCustomSharding(NonLinearAutomaticSharding.getShardMapping(sourceCollection, destinationCollection)).build())
+                                .withTimestampField(reindexSpecification.getTimestampField())
+                                .withCustomSharding(
+                                        NonLinearAutomaticSharding.getShardMapping(sourceCollection, destinationCollection))
+                                .build())
                 .collect(Collectors.toCollection(
                         () -> new PriorityQueue<>(Comparator.comparing(Reindex::getStartTime))));
     }
 
     public Mono<Void> run() {
         return Flux.<Reindex>generate((sink) -> {
-            Reindex stage = this.getStages().poll();
+            Reindex stage = this.getRemainingStages().poll();
             this.currentStage.set(stage);
             if (stage == null) {
                 this.currentStage.set(null);
@@ -76,7 +86,39 @@ public class ReindexJob {
             } else {
                 sink.next(stage);
             }
-        }).concatMap((stage) -> stage.getSubscribable().thenReturn(stage)).doOnNext((x) -> log.info(
-                "Reindex complete %s".formatted(x.getStartTime()))).then();
+        }).concatMap((stage) -> stage.getSubscribable().thenReturn(stage)).doOnNext((x) -> {
+            log.info(
+                    "Reindex complete {}", x.getStartTime());
+            this.finished = true;
+        }).then();
+    }
+
+    @Override
+    public State getState() {
+        if (finished) {
+            return State.FINISHED;
+        }
+
+        if (this.jobDisposable == null) {
+            return State.AWAITING;
+        } else {
+            if (this.jobDisposable.isDisposed()) {
+                return State.TERMINATED;
+            } else {
+                return State.RUNNING;
+            }
+        }
+    }
+
+    @Override
+    public void terminate() {
+        if (this.jobDisposable != null) {
+            this.jobDisposable.dispose();
+        }
+    }
+
+    @Override
+    public void start() {
+        this.jobDisposable = this.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 }

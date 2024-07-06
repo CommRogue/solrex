@@ -4,7 +4,7 @@ import lombok.Data;
 
 public interface StatefulJob {
     enum State {
-        RUNNING, FINISHED, PAUSED, TERMINATED
+        RUNNING, FINISHED, TERMINATED, AWAITING
     }
 
     State getState();
