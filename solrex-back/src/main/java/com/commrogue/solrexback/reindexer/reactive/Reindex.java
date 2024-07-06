@@ -1,6 +1,7 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
 import com.commrogue.solrexback.common.SolrCoreGatewayInformation;
+import com.commrogue.solrexback.reindexer.exceptions.OngoingDataImportException;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
@@ -30,12 +31,15 @@ public class Reindex {
     public Mono<Void> getSubscribable() {
         return Flux.fromIterable(reindexState.entrySet())
                 .flatMap((entry) -> Flux.fromIterable(entry.getValue().entrySet()).concatMap(
-                        (sourceEntry) -> DataImportRequest.builder(entry.getKey().getExternalAddress(),
-                                        sourceEntry.getKey().getInternalAddress()).withFqs(fqs).build()
-                                .getSubscribable().doOnNext((progress) -> log.info(
-                                        "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress))
-                                .doOnComplete(
-                                        () -> log.info("Sub-Reindex for {} complete", sourceEntry.getKey()))).doOnComplete(() -> log.info("Reindex complete for {}", entry.getKey()))).then();
+                                (sourceEntry) -> DataImportRequest.builder(entry.getKey().getExternalAddress(),
+                                                sourceEntry.getKey().getInternalAddress()).withFqs(fqs).build()
+                                        .getSubscribable().doOnNext((progress) -> log.info(
+                                                "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress))
+                                        .doOnComplete(
+                                                () -> log.info("Sub-Reindex for {} complete", sourceEntry.getKey()))
+                                        .doOnError((e) -> e instanceof OngoingDataImportException, (e) -> log.warn("A" +
+                                                " reindex is already in progress for {}", sourceEntry.getKey())))
+                        .doOnComplete(() -> log.info("Reindex complete for {}", entry.getKey()))).then();
 
 
 //        return this.shardMapping.entrySet().stream().reduce(Flux.<Void>empty(), (stageMono, entry) ->

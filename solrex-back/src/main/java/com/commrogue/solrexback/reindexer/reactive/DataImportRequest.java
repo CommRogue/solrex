@@ -1,6 +1,7 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
 import com.commrogue.solrexback.common.exceptions.InvalidResponseException;
+import com.commrogue.solrexback.reindexer.exceptions.OngoingDataImportException;
 import io.ino.solrs.JavaAsyncSolrClient;
 import lombok.Builder;
 import lombok.Singular;
@@ -10,12 +11,10 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import scala.xml.Null;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Builder(setterPrefix = "with")
@@ -37,7 +36,7 @@ public class DataImportRequest {
         dataImportRequest.set("commit", "true");
         dataImportRequest.set("url", sourceSolrUrl);
         dataImportRequest.set("fq", constructDataImportFqsParam(fqs));
-        statusRequest.set("qt", diRequestHandler);
+        statusRequest.set("qt", "/dataimport");
         statusRequest.set("command", "status");
     }
 
@@ -66,17 +65,21 @@ public class DataImportRequest {
     }
 
     private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
-        return statusObservable.repeatWhen((status) -> status.delayElements(Duration.ofSeconds(2))).takeUntil(response -> extractStatus(response).equals("idle")).map(
-                DataImportRequest::extractNumIndexed);
+        return statusObservable.repeatWhen((status) -> status.delayElements(Duration.ofSeconds(2)))
+                .takeUntil(response -> extractStatus(response).equals("idle")).map(
+                        DataImportRequest::extractNumIndexed);
     }
 
     @SuppressWarnings("unchecked")
     private static String extractStatus(QueryResponse response) {
-        try {
-            return (String) (response.getResponse().get("status"));
-        } catch (NullPointerException e) {
-            throw new InvalidResponseException("Unable to extract status from DataImport response. Verify that you are using the correct DataImport request handler", e);
+        String status = (String) (response.getResponse().get("status"));
+
+        if (status != null) {
+            return status;
         }
+
+        throw new InvalidResponseException(
+                "Unable to extract status from DataImport response. Verify that you are using the correct DataImport request handler");
     }
 
     public static DataImportRequestBuilder builder(JavaAsyncSolrClient destinationClient, String sourceSolrUrl) {
@@ -88,9 +91,15 @@ public class DataImportRequest {
     }
 
     public Flux<Integer> getSubscribable() {
-        return Mono.defer(() -> Mono.fromCompletionStage(this.destinationClient.query(dataImportRequest)))
+        return Mono.defer(() -> Mono.fromCompletionStage(this.destinationClient.query(statusRequest))
+                        .map(DataImportRequest::extractStatus
+                        ).doOnNext((status) -> {
+                            if (status.equals("busy")) {
+                                throw new OngoingDataImportException("A DataImport request is already in progress");
+                            }
+                        }).then(Mono.defer(() -> Mono.fromCompletionStage(this.destinationClient.query(dataImportRequest)))))
                 .thenMany(observeShardReindex(Mono.defer(() ->
-                        Mono.fromCompletionStage(this.destinationClient.query(dataImportRequest)))));
+                        Mono.fromCompletionStage(this.destinationClient.query(statusRequest)))));
 //        return Mono.just(1).doOnNext((x) -> log.info("%s to %s".formatted(this.sourceSolrUrl,
 //                this.destinationClient.toString()))).thenMany((Flux.defer(() -> Flux.interval(Duration.ofSeconds(
 //                ThreadLocalRandom.current().nextLong(1, 5))).take(3))).map((x) -> (int)x.longValue()));
