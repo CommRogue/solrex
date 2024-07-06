@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,13 +76,14 @@ public class Reindex {
         public ReindexBuilder withStartTime(LocalDateTime startTime) {
             this.startTime = startTime;
 
-            return this.withFq("timestamp:[%s TO *]" .formatted(startTime));
+            return this.withFq("%s:[%s TO *]" .formatted(this.timestampField, startTime.format(
+                    DateTimeFormatter.ISO_DATE)));
         }
 
         public ReindexBuilder withEndTime(LocalDateTime endTime) {
             this.endTime = endTime;
 
-            return this.withFq("timestamp:[* TO %s]" .formatted(endTime));
+            return this.withFq("%s:[* TO %s]" .formatted(this.timestampField, endTime.format(DateTimeFormatter.ISO_DATE)));
         }
     }
 
@@ -90,10 +92,24 @@ public class Reindex {
         public Reindex build() {
             Reindex reindex = super.build();
 
-            if (reindex.getTimestampField() == null &&
-                    (reindex.getStartTime() != null || reindex.getEndTime() != null)) {
-                throw new IllegalArgumentException("A start or end time has been specified for the reindex but no " +
-                        "timestamp field was specified");
+            if (reindex.getStartTime() != null || reindex.getEndTime() != null) {
+                if (reindex.getTimestampField() == null) {
+                    throw new IllegalArgumentException(
+                            "A start or end time has been specified for the reindex but no " +
+                                    "timestamp field was specified");
+                }
+                // TODO - implememnt start/end times in PostBuilder. currently, it is dependent on timestamp field
+                //  being given before start and end times
+//                if (reindex.getStartTime() != null && reindex.getEndTime() != null) {
+//                    reindex.getFqs()
+//                            .add("timestamp:[%s TO %s]" .formatted(reindex.getStartTime(), reindex.getEndTime()));
+//                } else {
+//                    if (reindex.getStartTime() != null) {
+//                        reindex.getFqs().add("timestamp:[%s TO *]" .formatted(reindex.getStartTime()));
+//                    } else {
+//                        reindex.getFqs().add("timestamp:[* TO %s]" .formatted(reindex.getEndTime()));
+//                    }
+//                }
             }
 
             return reindex;

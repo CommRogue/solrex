@@ -63,11 +63,11 @@ public class ReindexJob implements StatefulJob {
 
         return IntStream.range(0, reindexSpecification.getStagingAmount()).mapToObj(
                         (stageIndex) -> Reindex.builder().withDiRequestHandler(reindexSpecification.getDiRequestHandler())
+                                .withTimestampField(reindexSpecification.getTimestampField())
                                 .withStartTime(reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex)))
                                 .withEndTime(
                                         reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex + 1)))
                                 .withIsNatNetworking(reindexSpecification.isNatNetworking())
-                                .withTimestampField(reindexSpecification.getTimestampField())
                                 .withCustomSharding(
                                         NonLinearAutomaticSharding.getShardMapping(sourceCollection, destinationCollection))
                                 .build())
