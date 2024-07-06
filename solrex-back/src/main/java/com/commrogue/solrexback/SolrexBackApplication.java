@@ -8,8 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class SolrexBackApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(SolrexBackApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(SolrexBackApplication.class, args);
+    }
 
 }

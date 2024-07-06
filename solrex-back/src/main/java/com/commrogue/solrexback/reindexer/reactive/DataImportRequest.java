@@ -31,19 +31,6 @@ public class DataImportRequest {
     private final SolrQuery statusRequest = new SolrQuery();
     private final SolrQuery cancelRequest = new SolrQuery();
 
-    private void init() {
-        dataImportRequest.set("qt", "/dataimport");
-        dataImportRequest.set("internalDih", diRequestHandler);
-        dataImportRequest.set("command", "full-import");
-        dataImportRequest.set("commit", "true");
-        dataImportRequest.set("url", sourceSolrUrl);
-        dataImportRequest.set("fq", constructDataImportFqsParam(fqs));
-        statusRequest.set("qt", "/dataimport");
-        statusRequest.set("command", "status");
-        cancelRequest.set("qt", "/dataimport");
-        cancelRequest.set("command", "abort");
-    }
-
     private static String constructDataImportFqsParam(List<String> fqs) {
         return String.join(",", fqs);
     }
@@ -66,12 +53,6 @@ public class DataImportRequest {
         } catch (NullPointerException e) {
             throw new InvalidResponseException("Unable to extract status code from DataImport response", e);
         }
-    }
-
-    private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
-        return statusObservable.repeatWhen((status) -> status.delayElements(Duration.ofSeconds(2)))
-                .takeUntil(response -> extractStatus(response).equals("idle")).map(
-                        DataImportRequest::extractNumIndexed);
     }
 
     @SuppressWarnings("unchecked")
@@ -99,6 +80,25 @@ public class DataImportRequest {
                 request);
 
         return Mono.fromCompletionStage(destinationClient.query(request));
+    }
+
+    private void init() {
+        dataImportRequest.set("qt", "/dataimport");
+        dataImportRequest.set("internalDih", diRequestHandler);
+        dataImportRequest.set("command", "full-import");
+        dataImportRequest.set("commit", "true");
+        dataImportRequest.set("url", sourceSolrUrl);
+        dataImportRequest.set("fq", constructDataImportFqsParam(fqs));
+        statusRequest.set("qt", "/dataimport");
+        statusRequest.set("command", "status");
+        cancelRequest.set("qt", "/dataimport");
+        cancelRequest.set("command", "abort");
+    }
+
+    private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
+        return statusObservable.repeatWhen((status) -> status.delayElements(Duration.ofSeconds(2)))
+                .takeUntil(response -> extractStatus(response).equals("idle")).map(
+                        DataImportRequest::extractNumIndexed);
     }
 
     public Flux<Integer> getSubscribable() {

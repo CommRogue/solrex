@@ -16,7 +16,8 @@ public class SpringDocConfiguration {
                 .info(
                         new Info()
                                 .title("Solrex API")
-                                .description("Solrex is an administration toolkit and interface for managing large-scale Apache Solr™ SolrCloud clusters.")
+                                .description(
+                                        "Solrex is an administration toolkit and interface for managing large-scale Apache Solr™ SolrCloud clusters.")
                                 .contact(
                                         new Contact()
                                                 .email("apiteam@swagger.io")
@@ -28,6 +29,6 @@ public class SpringDocConfiguration {
                                 )
                                 .version("1.0.0")
                 )
-        ;
+                ;
     }
 }

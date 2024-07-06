@@ -12,6 +12,8 @@ public class DataImportRequestState {
     long indexed;
 
     public Double getIndexingRate() {
-        return (indexed / (double)Duration.between(started, finished != null ? finished : LocalDateTime.now()).toMillis()) * 1000;
+        return (indexed /
+                (double) Duration.between(started, finished != null ? finished : LocalDateTime.now()).toMillis()) *
+                1000;
     }
 }

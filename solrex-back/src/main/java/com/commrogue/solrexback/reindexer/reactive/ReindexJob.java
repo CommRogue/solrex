@@ -31,12 +31,14 @@ import static com.commrogue.solrexback.reindexer.Helpers.getCloudSolrClientFromZ
 @Valid
 @Slf4j
 public class ReindexJob implements StatefulJob {
-    private Disposable jobDisposable;
-    private boolean finished;
     @NonNull
     private final ReindexSpecification reindexSpecification;
     @Getter
     private final AtomicReference<Reindex> currentStage = new AtomicReference<>();
+    @Getter(lazy = true)
+    private final Queue<Reindex> remainingStages = generateStages();
+    private Disposable jobDisposable;
+    private boolean finished;
 
     public ReindexJob(String timestampField, LocalDateTime startDate, LocalDateTime endDate, Collection srcCollection,
                       Collection dstCollection, int stagingAmount, String diRequestHandler, boolean isNatNetworking) {
@@ -46,9 +48,6 @@ public class ReindexJob implements StatefulJob {
                         .withStagingAmount(stagingAmount).withDiRequestHandler(diRequestHandler)
                         .withIsNatNetworking(isNatNetworking).build();
     }
-
-    @Getter(lazy = true)
-    private final Queue<Reindex> remainingStages = generateStages();
 
     public Queue<Reindex> generateStages() {
         DocCollection sourceCollection = getCloudSolrClientFromZk(

@@ -7,6 +7,7 @@ import java.util.Optional;
 
 public class Helpers {
     public static CloudLegacySolrClient getCloudSolrClientFromZk(String zkConnectionString) {
-        return new CloudLegacySolrClient.Builder(Arrays.asList(zkConnectionString.split(",")), Optional.empty()).build();
+        return new CloudLegacySolrClient.Builder(Arrays.asList(zkConnectionString.split(",")),
+                Optional.empty()).build();
     }
 }

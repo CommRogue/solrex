@@ -8,7 +8,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class ReindexState extends HashMap<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> {
+public class ReindexState
+        extends HashMap<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> {
+    public ReindexState(
+            Map<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> shardMapping) {
+        super(shardMapping);
+    }
+
     private static SolrCoreGatewayInformation getLeaderUrlForShardSlice(Slice shardSlice,
                                                                         boolean isNatNetworking) {
         var coreUrl = shardSlice.getLeader().getCoreUrl();
@@ -16,10 +22,6 @@ public class ReindexState extends HashMap<SolrCoreGatewayInformation, Map<SolrCo
         return new SolrCoreGatewayInformation(coreUrl, isNatNetworking ? coreUrl.replaceFirst("192\\.168\\.\\d+\\" +
                         ".\\d+",
                 "localhost") : coreUrl);
-    }
-
-    public ReindexState(Map<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> shardMapping) {
-        super(shardMapping);
     }
 
     public static ReindexState fromSliceMapping(Map<Slice, ? extends Set<Slice>> shardMapping,

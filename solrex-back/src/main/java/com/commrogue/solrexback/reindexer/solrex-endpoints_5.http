@@ -11,7 +11,7 @@ Content-Type: application/json
     "collectionName": "ew",
     "zkConnectionString": "ewew"
   },
-  "startDate": "2024-01-01T00:00:00Z", 
-  "endDate": "2024-02-01T00:00:00Z", 
+  "startDate": "2024-01-01T00:00:00Z",
+  "endDate": "2024-02-01T00:00:00Z",
   "stagingAmount": 2
 }

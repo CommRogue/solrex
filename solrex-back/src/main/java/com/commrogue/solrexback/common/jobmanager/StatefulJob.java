@@ -1,13 +1,13 @@
 package com.commrogue.solrexback.common.jobmanager;
 
-import lombok.Data;
-
 public interface StatefulJob {
+    State getState();
+
+    void terminate();
+
+    void start();
+
     enum State {
         RUNNING, FINISHED, TERMINATED, AWAITING
     }
-
-    State getState();
-    void terminate();
-    void start();
 }

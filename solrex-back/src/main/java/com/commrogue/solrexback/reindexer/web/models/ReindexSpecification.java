@@ -2,8 +2,9 @@ package com.commrogue.solrexback.reindexer.web.models;
 
 import com.commrogue.solrexback.common.Collection;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NonNull;
 
 import java.time.LocalDateTime;
 

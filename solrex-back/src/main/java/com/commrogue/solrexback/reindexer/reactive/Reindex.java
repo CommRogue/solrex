@@ -22,11 +22,15 @@ public class Reindex {
     private final String timestampField;
     private final LocalDateTime startTime;
     private final LocalDateTime endTime;
-    private String diRequestHandler;
     @Singular
     private final List<String> fqs;
     private final ReindexState reindexState;
     private final boolean isNatNetworking;
+    private String diRequestHandler;
+
+    public static PostBuilder builder() {
+        return new PostBuilder();
+    }
 
     public Mono<Void> getSubscribable() {
         return Flux.fromIterable(reindexState.entrySet())
@@ -51,10 +55,6 @@ public class Reindex {
                                                 " reindex is already in progress for {}", sourceEntry.getKey())))
                         .doOnCancel(() -> log.info("Reindex cancelled for {}", entry.getKey()))
                         .doOnComplete(() -> log.info("Reindex complete for {}", entry.getKey()))).then();
-    }
-
-    public static PostBuilder builder() {
-        return new PostBuilder();
     }
 
     public static class ReindexBuilder {

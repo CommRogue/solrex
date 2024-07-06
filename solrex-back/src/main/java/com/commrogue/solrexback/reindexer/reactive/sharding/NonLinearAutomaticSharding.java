@@ -16,7 +16,8 @@ public class NonLinearAutomaticSharding {
                 destinationCollection.getActiveSlices().size() / (double) sourceCollection.getActiveSlices().size();
         AtomicReference<Double> currentShardBalance = new AtomicReference<>(1.0);
 
-        return sourceCollection.getActiveSlices().stream().sorted(Comparator.comparing((s) -> Integer.parseInt(s.getName().substring(5))))
+        return sourceCollection.getActiveSlices().stream()
+                .sorted(Comparator.comparing((s) -> Integer.parseInt(s.getName().substring(5))))
                 .reduce(new HashMap<>(), (sliceSetHashMap, sourceSlice) -> {
                     Slice destinationSlice = destinationCollection.getSlice(
                             "shard" + Math.round(currentShardBalance.getAndAccumulate(shardsBalance, Double::sum)));
