@@ -1,3 +1,5 @@
+![solrex logo](https://i.ibb.co/L8fDFsW/final-Solr-1-cropped.png)
+
 # Solrex
 An administration toolkit and interface for managing large scale Apache Solr™ clusters. 
 
