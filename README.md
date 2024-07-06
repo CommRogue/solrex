@@ -8,7 +8,7 @@ An administration toolkit and interface for managing large scale Apache Solr™ 
 - Support for variable sized sharding configurations between source and destination collections.
 - Automatic progress reporting and abortion capability.
 - Optional support for NAT networking configurations (eg. running Solr on an isolated network via Docker, Kubernetes...)
-### Feature tracking
+## Feature tracking
 [See the following Trello board](https://trello.com/b/FrMiMvTp/solrex)
 
 ## Technologies
