@@ -5,10 +5,10 @@ import io.ino.solrs.JavaAsyncSolrClient;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ShardMapping extends HashMap<JavaAsyncSolrClient, Map<JavaAsyncSolrClient, Integer>> {
+public class ReindexState extends HashMap<String, Map<String, Integer>> {
     public int totalIndexed;
 
-    public ShardMapping(Map<JavaAsyncSolrClient, Map<JavaAsyncSolrClient, Integer>> shardMapping) {
+    public ReindexState(Map<String, Map<String, Integer>> shardMapping) {
         super(shardMapping);
     }
 }

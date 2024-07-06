@@ -20,5 +20,7 @@ public class ReindexSpecification {
     @NotNull
     private final LocalDateTime endDate;
     private final Integer stagingAmount;
+    private final String diRequestHandler;
+    private final boolean isNatNetworking;
 }
 

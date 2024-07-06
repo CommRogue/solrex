@@ -1,22 +1,42 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
-import org.apache.solr.client.solrj.impl.CloudLegacySolrClient;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import com.commrogue.solrexback.common.Collection;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.stereotype.Component;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
+import java.time.LocalDateTime;
 
-public class MainTest {
-    public static void main(String[] args) throws IOException {
-        try (CloudLegacySolrClient destinationClient = new CloudLegacySolrClient.Builder(List.of("localhost:2182"), Optional.empty()).build();
-             CloudLegacySolrClient sourceClient = new CloudLegacySolrClient.Builder(List.of("localhost:2181"), Optional.empty()).build()) {
-            var destinationCollection = destinationClient.getClusterState().getCollection("products");
-            var sourceCollection = sourceClient.getClusterState().getCollection("xax");
-            destinationCollection.getActiveSlices().forEach(slice -> {
-                System.out.println(slice.getLeader().getCoreUrl());
-            });
-            System.out.println("ew");
-        }
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MainTest implements ApplicationRunner {
+    @Value("${reindexer.dataimport-rh}")
+    private String diRequestHandler;
+
+    @Value("${reindexer.networking.nat}")
+    private boolean isNatNetworking;
+
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        //        try (CloudLegacySolrClient destinationClient = new CloudLegacySolrClient.Builder(List.of("localhost:2182"), Optional.empty()).build();
+//             CloudLegacySolrClient sourceClient = new CloudLegacySolrClient.Builder(List.of("localhost:2181"), Optional.empty()).build()) {
+//            var destinationCollection = destinationClient.getClusterState().getCollection("products");
+//            var sourceCollection = sourceClient.getClusterState().getCollection("xax");
+//            destinationCollection.getActiveSlices().forEach(slice -> {
+//                System.out.println(slice.getLeader().getCoreUrl());
+//            });
+//            System.out.println("ew");
+//        }
+        ReindexJob reindexJob =
+                new ReindexJob(LocalDateTime.of(2024, 1, 1, 0, 0, 0), LocalDateTime.of(2024, 1, 2, 0, 0, 0),
+                        new Collection("localhost:2181", "xax"), new Collection("localhost:2182", "products"), 5,
+                        diRequestHandler, isNatNetworking);
+        reindexJob.run().subscribeOn(Schedulers.immediate()).subscribe();
     }
 }
