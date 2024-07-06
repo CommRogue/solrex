@@ -55,7 +55,7 @@ public class ReindexJob {
                         .dividedBy(reindexSpecification.getStagingAmount());
 
         return IntStream.range(0, reindexSpecification.getStagingAmount()).mapToObj(
-                        (stageIndex) -> Reindex.builder(reindexSpecification.getDiRequestHandler())
+                        (stageIndex) -> Reindex.builder().withDiRequestHandler(reindexSpecification.getDiRequestHandler())
                                 .withStartTime(reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex)))
                                 .withEndTime(
                                         reindexSpecification.getStartDate().plus(stageDuration.multipliedBy(stageIndex + 1)))

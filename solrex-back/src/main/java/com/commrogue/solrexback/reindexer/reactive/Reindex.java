@@ -31,7 +31,7 @@ public class Reindex {
         return Flux.fromIterable(reindexState.entrySet())
                 .flatMap((entry) -> Flux.fromIterable(entry.getValue().entrySet()).concatMap(
                         (sourceEntry) -> DataImportRequest.builder(entry.getKey(),
-                                        sourceEntry.getKey(), diRequestHandler).withFqs(fqs).build()
+                                        sourceEntry.getKey()).withFqs(fqs).build()
                                 .getSubscribable().doOnNext((progress) -> log.info(
                                         "Sub-Reindex progress for {} - {}", sourceEntry.getKey(), progress))
                                 .doOnComplete(
@@ -49,10 +49,6 @@ public class Reindex {
 //                                ), Flux::concatWith).then()
 //                ), Flux::mergeWith).then();
 //    }
-    }
-
-    public static ReindexBuilder builder(String diRequestHandler) {
-        return new ReindexBuilder().withDiRequestHandler(diRequestHandler);
     }
 
     public static class ReindexBuilder {

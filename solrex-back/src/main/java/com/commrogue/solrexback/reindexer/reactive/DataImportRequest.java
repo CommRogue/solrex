@@ -1,5 +1,6 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
+import com.commrogue.solrexback.common.exceptions.InvalidResponseException;
 import io.ino.solrs.JavaAsyncSolrClient;
 import lombok.Builder;
 import lombok.Singular;
@@ -9,6 +10,7 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import scala.xml.Null;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -29,7 +31,8 @@ public class DataImportRequest {
     private final SolrQuery statusRequest = new SolrQuery();
 
     void init() {
-        dataImportRequest.set("qt", diRequestHandler);
+        dataImportRequest.set("qt", "/dataimport");
+        dataImportRequest.set("internalDih", diRequestHandler);
         dataImportRequest.set("command", "full-import");
         dataImportRequest.set("commit", "true");
         dataImportRequest.set("url", sourceSolrUrl);
@@ -43,14 +46,23 @@ public class DataImportRequest {
     }
 
     private static int extractNumIndexed(QueryResponse response) {
-        return Integer.parseInt(((LinkedHashMap<String, String>) response.getResponse().get("statusMessages")).get(
-                "Total Rows Fetched"));
+        try {
+            return Integer.parseInt(((LinkedHashMap<String, String>) response.getResponse().get("statusMessages")).get(
+                    "Total Rows Fetched"));
+        } catch (NullPointerException e) {
+            throw new InvalidResponseException("Unable to extract number of indexed documents from DataImport " +
+                    "response. Verify that you are using the correct DataImport request handler", e);
+        }
     }
 
     @SuppressWarnings("unchecked")
     private static int extractStatusCode(QueryResponse response) {
-        return ((SimpleOrderedMap<Integer>) (response.getResponse().get("responseHeader"))).get(
-                "status");
+        try {
+            return ((SimpleOrderedMap<Integer>) (response.getResponse().get("responseHeader"))).get(
+                    "status");
+        } catch (NullPointerException e) {
+            throw new InvalidResponseException("Unable to extract status code from DataImport response", e);
+        }
     }
 
     private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
@@ -60,16 +72,19 @@ public class DataImportRequest {
 
     @SuppressWarnings("unchecked")
     private static String extractStatus(QueryResponse response) {
-        return (String) (response.getResponse().get("status"));
+        try {
+            return (String) (response.getResponse().get("status"));
+        } catch (NullPointerException e) {
+            throw new InvalidResponseException("Unable to extract status from DataImport response. Verify that you are using the correct DataImport request handler", e);
+        }
     }
 
-    public static DataImportRequestBuilder builder(JavaAsyncSolrClient destinationClient, String sourceSolrUrl,
-                                                   String diRequestHandler) {
-        return new PostBuilder().withDestinationClient(destinationClient).withSourceSolrUrl(sourceSolrUrl).withDiRequestHandler(diRequestHandler);
+    public static DataImportRequestBuilder builder(JavaAsyncSolrClient destinationClient, String sourceSolrUrl) {
+        return new PostBuilder().withDestinationClient(destinationClient).withSourceSolrUrl(sourceSolrUrl);
     }
 
-    public static DataImportRequestBuilder builder(String destinationSolrUrl, String sourceSolrUrl, String diRequestHandler) {
-        return builder(JavaAsyncSolrClient.create(destinationSolrUrl), sourceSolrUrl, diRequestHandler);
+    public static DataImportRequestBuilder builder(String destinationSolrUrl, String sourceSolrUrl) {
+        return builder(JavaAsyncSolrClient.create(destinationSolrUrl), sourceSolrUrl);
     }
 
     public Flux<Integer> getSubscribable() {
