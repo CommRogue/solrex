@@ -2,11 +2,44 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.3.0'
 	id 'io.spring.dependency-management' version '1.1.5'
-	id 'org.graalvm.buildtools.native' version '0.10.2'
+	// optional graalvm
+	//id 'org.graalvm.buildtools.native' version '0.10.2'
+	id "com.diffplug.spotless" version "7.0.0.BETA3"
 }
 
 group = 'com.commrogue'
 version = '0.0.1-SNAPSHOT'
+
+spotless {
+	ratchetFrom 'origin/main'
+
+	format 'misc', {
+		target '*.gradle', '.gitattributes', '.gitignore'
+		trimTrailingWhitespace()
+		indentWithTabs() // or spaces. Takes an integer argument if you don't like 4
+		endWithNewline()
+	}
+	java {
+		importOrder()
+		prettier(['prettier': '3.3.3', 'prettier-plugin-java': '2.6.4'])
+				.config(['parser': 'java', 'tabWidth': 4, 'plugins': ['prettier-plugin-java']])
+		formatAnnotations()
+		licenseHeader '/* (C)Team Eclipse $YEAR */'
+	}
+}
+
+afterEvaluate {
+	def spotless = tasks.findByName('spotlessApply')
+	if (spotless) {
+		tasks.withType(JavaCompile) {
+			finalizedBy(spotless)
+		}
+
+		tasks.withType(GroovyCompile) {
+			finalizedBy(spotless)
+		}
+	}
+}
 
 java {
 	toolchain {
