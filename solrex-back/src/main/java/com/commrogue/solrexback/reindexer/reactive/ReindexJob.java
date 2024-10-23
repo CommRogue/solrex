@@ -1,10 +1,10 @@
 /* (C)Team Eclipse 2024 */
 package com.commrogue.solrexback.reindexer.reactive;
 
-import static com.commrogue.solrexback.reindexer.Helpers.getCloudSolrClientFromZk;
+import static com.commrogue.solrexback.reindexer.helpers.SolrHelpers.getCloudSolrClientFromZk;
 
 import com.commrogue.solrexback.common.Collection;
-import com.commrogue.solrexback.common.jobmanager.StatefulJob;
+import com.commrogue.solrexback.common.web.jobmanager.StatefulJob;
 import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import jakarta.validation.Valid;

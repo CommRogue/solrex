@@ -23,6 +23,7 @@ spotless {
 		importOrder()
 		prettier(['prettier': '3.3.3', 'prettier-plugin-java': '2.6.4'])
 				.config(['parser': 'java', 'tabWidth': 4, 'plugins': ['prettier-plugin-java']])
+		removeUnusedImports()
 		formatAnnotations()
 		licenseHeader '/* (C)Team Eclipse $YEAR */'
 	}
