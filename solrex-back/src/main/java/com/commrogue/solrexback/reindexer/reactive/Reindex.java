@@ -29,7 +29,15 @@ public class Reindex {
     private final List<String> fqs;
 
     private final ReindexState reindexState;
-    private String diRequestHandler;
+
+    @Builder.Default
+    private final String srcDiRequestHandler = "/dih";
+
+    @Builder.Default
+    private final String dstDiRequestHandler = "/dataimport";
+
+    @Builder.Default
+    private final boolean commit = true;
 
     public static AspectBuilder builder(
         DocCollection source,
@@ -57,13 +65,20 @@ public class Reindex {
                             sourceEntry.getKey().getInternalAddress()
                         )
                             .withFqs(fqs)
+                            .withSrcDiRequestHandler(
+                                this.getSrcDiRequestHandler()
+                            )
+                            .withDstDiRequestHandler(
+                                this.getDstDiRequestHandler()
+                            )
+                            .withCommit(this.isCommit())
                             .build()
                             .getSubscribable()
                             .doOnSubscribe(_ -> {
                                 log
                                     .atDebug()
                                     .addKeyValue("targets", entry.getKey())
-                                    .setMessage("Sub-Reindex" + " started")
+                                    .setMessage("Sub-Reindex started")
                                     .log();
 
                                 sourceEntry
@@ -78,7 +93,7 @@ public class Reindex {
                                         sourceEntry.getKey()
                                     )
                                     .addKeyValue("progress", progress)
-                                    .setMessage("Sub-Reindex" + " progress")
+                                    .setMessage("Sub-Reindex progress")
                                     .log();
                                 sourceEntry.getValue().setIndexed(progress);
                             })
@@ -89,7 +104,7 @@ public class Reindex {
                                         "targets",
                                         sourceEntry.getKey()
                                     )
-                                    .setMessage("Sub-Reindex" + " complete")
+                                    .setMessage("Sub-Reindex complete")
                                     .log();
                                 sourceEntry
                                     .getValue()
@@ -99,10 +114,7 @@ public class Reindex {
                                 e -> e instanceof OngoingDataImportException,
                                 _ ->
                                     log.warn(
-                                        "A reindex" +
-                                        " is already" +
-                                        " in progress" +
-                                        " for {}",
+                                        "A reindex is already in progress for {}",
                                         sourceEntry.getKey()
                                     )
                             )
@@ -122,7 +134,7 @@ public class Reindex {
         protected Supplier<
             Map<Slice, ? extends Set<Slice>>
         > shardMappingSupplier;
-        protected boolean isNatNetworking;
+        protected boolean isNatNetworking = false;
 
         // protect @Builder's withReindexState, as it should not be used outside of Builder class
         protected ReindexBuilder withReindexState(ReindexState reindexState) {

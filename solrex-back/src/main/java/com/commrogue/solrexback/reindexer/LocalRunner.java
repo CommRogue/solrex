@@ -19,31 +19,24 @@ import reactor.core.scheduler.Schedulers;
 @RequiredArgsConstructor
 @Profile("local-runner")
 public class LocalRunner implements ApplicationRunner {
-
-    @Value("${reindexer.dataimport-rh}")
-    private String diRequestHandler;
-
-    @Value("${reindexer.networking.nat}")
-    private boolean isNatNetworking;
-
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        ReindexJob reindexJob = new ReindexJob(
-            "bank_date",
-            LocalDateTime.of(2024, 1, 1, 0, 0, 0),
-            LocalDateTime.of(2024, 1, 2, 0, 0, 0),
-            new Collection("localhost:2181", "xax"),
-            new Collection("localhost:2182", "products"),
-            5,
-            diRequestHandler,
-            isNatNetworking
-        );
+        ReindexJob reindexJob = ReindexJob.builder()
+            .withTimestampField("bank_date")
+            .withStartDate(LocalDateTime.of(2024, 1, 1, 0, 0, 0))
+            .withEndDate(LocalDateTime.of(2024, 1, 2, 0, 0, 0))
+            .withSrcCollection(new Collection("localhost:2181", "xax"))
+            .withDstCollection(new Collection("localhost:2182", "products"))
+            .withStagingAmount(5)
+            .withSrcDiRequestHandler("diRequestHandler")
+            .withIsNatNetworking(true)
+            .build();
+
         Disposable disposable = reindexJob
             .run()
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe();
 
-        // sleep 5 seconds
         Thread.sleep(5000);
 
         disposable.dispose();

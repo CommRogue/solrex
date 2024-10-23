@@ -11,14 +11,15 @@ import jakarta.validation.Valid;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import lombok.Builder;
 import lombok.Getter;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.solr.common.cloud.DocCollection;
 import reactor.core.Disposable;
@@ -26,14 +27,23 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-@RequiredArgsConstructor
 @Valid
 @Slf4j
+@Getter
+@Builder(setterPrefix = "with")
 public class ReindexJob implements StatefulJob {
 
-    @NonNull private final ReindexSpecification reindexSpecification;
+    private final String timestampField;
+    private final LocalDateTime startDate;
+    private final LocalDateTime endDate;
+    private final Collection srcCollection;
+    private final Collection dstCollection;
+    private final int stagingAmount;
+    private final String srcDiRequestHandler;
+    private final String dstDiRequestHandler;
+    private final Boolean isNatNetworking;
+    private final Boolean commit;
 
-    @Getter
     private final AtomicReference<Reindex> currentStage =
         new AtomicReference<>();
 
@@ -43,75 +53,67 @@ public class ReindexJob implements StatefulJob {
     private Disposable jobDisposable;
     private boolean finished;
 
-    public ReindexJob(
-        String timestampField,
-        LocalDateTime startDate,
-        LocalDateTime endDate,
-        Collection srcCollection,
-        Collection dstCollection,
-        int stagingAmount,
-        String diRequestHandler,
-        boolean isNatNetworking
-    ) {
-        this.reindexSpecification = ReindexSpecification.builder()
-            .withTimestampField(timestampField)
-            .withStartDate(startDate)
-            .withEndDate(endDate)
-            .withSrcCollection(srcCollection)
-            .withDstCollection(dstCollection)
-            .withStagingAmount(stagingAmount)
-            .withDiRequestHandler(diRequestHandler)
-            .withIsNatNetworking(isNatNetworking)
-            .build();
+    public ReindexJob(ReindexSpecification reindexSpecification) {
+        this.timestampField = reindexSpecification.getTimestampField();
+        this.startDate = reindexSpecification.getStartDate();
+        this.endDate = reindexSpecification.getEndDate();
+        this.srcCollection = reindexSpecification.getSrcCollection();
+        this.dstCollection = reindexSpecification.getDstCollection();
+        this.stagingAmount = reindexSpecification.getStagingAmount();
+        this.srcDiRequestHandler =
+            reindexSpecification.getSrcDiRequestHandler();
+        this.dstDiRequestHandler =
+            reindexSpecification.getDstDiRequestHandler();
+        this.isNatNetworking = reindexSpecification.getIsNatNetworking();
+        this.commit = reindexSpecification.getShouldCommit();
     }
 
     public Queue<Reindex> generateStages() {
         DocCollection sourceCollection = getCloudSolrClientFromZk(
-            reindexSpecification.getSrcCollection().getZkConnectionString()
+            this.getSrcCollection().getZkConnectionString()
         )
             .getClusterState()
-            .getCollection(
-                reindexSpecification.getSrcCollection().getCollectionName()
-            );
+            .getCollection(this.getSrcCollection().getCollectionName());
         DocCollection destinationCollection = getCloudSolrClientFromZk(
-            reindexSpecification.getDstCollection().getZkConnectionString()
+            this.getDstCollection().getZkConnectionString()
         )
             .getClusterState()
-            .getCollection(
-                reindexSpecification.getDstCollection().getCollectionName()
-            );
+            .getCollection(this.getDstCollection().getCollectionName());
 
         Duration stageDuration = Duration.between(
-            reindexSpecification.getStartDate(),
-            reindexSpecification.getEndDate()
-        ).dividedBy(reindexSpecification.getStagingAmount());
+            this.getStartDate(),
+            this.getEndDate()
+        ).dividedBy(this.getStagingAmount());
 
-        return IntStream.range(0, reindexSpecification.getStagingAmount())
-            .mapToObj(stageIndex ->
-                Reindex.builder(
+        return IntStream.range(0, this.getStagingAmount())
+            .mapToObj(stageIndex -> {
+                Reindex.ReindexBuilder builder = Reindex.builder(
                     sourceCollection,
                     destinationCollection,
                     NonLinearAutomaticSharding::getShardMapping
                 )
-                    .withDiRequestHandler(
-                        reindexSpecification.getDiRequestHandler()
-                    )
-                    .withTimestampField(
-                        reindexSpecification.getTimestampField()
-                    )
+                    .withTimestampField(this.getTimestampField())
                     .withStartTime(
-                        reindexSpecification
-                            .getStartDate()
+                        this.getStartDate()
                             .plus(stageDuration.multipliedBy(stageIndex))
                     )
                     .withEndTime(
-                        reindexSpecification
-                            .getStartDate()
+                        this.getStartDate()
                             .plus(stageDuration.multipliedBy(stageIndex + 1))
-                    )
-                    .withIsNatNetworking(reindexSpecification.isNatNetworking())
-                    .build()
-            )
+                    );
+
+                Optional.ofNullable(this.getSrcDiRequestHandler()).ifPresent(
+                    builder::withSrcDiRequestHandler
+                );
+                Optional.ofNullable(this.getDstDiRequestHandler()).ifPresent(
+                    builder::withDstDiRequestHandler
+                );
+                Optional.ofNullable(this.getCommit()).ifPresent(
+                    builder::withCommit
+                );
+
+                return builder.build();
+            })
             .collect(
                 Collectors.toCollection(() ->
                     new PriorityQueue<>(

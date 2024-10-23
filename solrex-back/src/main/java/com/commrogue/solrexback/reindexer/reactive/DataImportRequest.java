@@ -20,18 +20,11 @@ import reactor.core.scheduler.Schedulers;
 @Slf4j
 @Builder(setterPrefix = "with")
 public class DataImportRequest {
-
     private final JavaAsyncSolrClient destinationClient;
     private final String sourceSolrUrl;
-
-    @Builder.Default
-    private final String srcDiRequestHandler = "/dih";
-
-    @Builder.Default
-    private final String destDiRequestHandler = "/dataimport";
-
-    @Builder.Default
-    private final boolean commit = true;
+    private final String srcDiRequestHandler;
+    private final String dstDiRequestHandler;
+    private final boolean commit;
 
     @Singular
     private final List<String> fqs;
@@ -41,15 +34,15 @@ public class DataImportRequest {
     private final SolrQuery cancelRequest = new SolrQuery();
 
     private void init() {
-        dataImportRequest.set("qt", this.destDiRequestHandler);
+        dataImportRequest.set("qt", this.dstDiRequestHandler);
         dataImportRequest.set("internalDih", this.srcDiRequestHandler);
         dataImportRequest.set("command", "full-import");
         dataImportRequest.set("commit", this.commit);
         dataImportRequest.set("url", sourceSolrUrl);
         dataImportRequest.set("fq", constructDataImportFqsParam(fqs));
-        statusRequest.set("qt", destDiRequestHandler);
+        statusRequest.set("qt", dstDiRequestHandler);
         statusRequest.set("command", "status");
-        cancelRequest.set("qt", destDiRequestHandler);
+        cancelRequest.set("qt", dstDiRequestHandler);
         cancelRequest.set("command", "abort");
     }
 

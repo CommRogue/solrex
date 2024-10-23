@@ -49,6 +49,15 @@ public class ReindexerController {
             ),
         }
     )
+    /**
+     * Initiates reindexing from a source to a target collection based on the provided reindex specification.
+     * Validates the start and end dates in the specification.
+     * Returns a Mono containing the UUID of the reindex job.
+     *
+     * @param reindexSpecification The reindex specification containing details for the reindexing process.
+     * @return A Mono containing the UUID of the reindex job.
+     * @throws ResponseStatusException if the end date is not after the start date in the specification.
+     */
     @RequestMapping(method = RequestMethod.POST, value = "/")
     public Mono<String> reindex(
         @RequestBody ReindexSpecification reindexSpecification
@@ -69,6 +78,12 @@ public class ReindexerController {
         return Mono.just(reindexUUID.toString());
     }
 
+    /**
+     * Retrieves the status of a reindex job identified by the provided UUID.
+     *
+     * @param uuid The UUID of the reindex job to check the status for.
+     * @return A Mono containing the string representation of the current state of the reindex job.
+     */
     @Operation(tags = { "Reindex" })
     @RequestMapping(method = RequestMethod.GET, value = "/status/{uuid}")
     public Mono<String> checkStatus(@PathVariable String uuid) {
@@ -77,6 +92,15 @@ public class ReindexerController {
         );
     }
 
+    /*
+     * Endpoint to initiate reindexing from a source to a target collection based on the provided reindex specification.
+     * Validates the start and end dates in the specification.
+     * Returns a Mono containing the UUID of the reindex job.
+     *
+     * @param reindexSpecification The reindex specification containing details for the reindexing process.
+     * @return A Mono containing the UUID of the reindex job.
+     * @throws ResponseStatusException if the end date is not after the start date in the specification.
+     */
     @Operation(tags = { "Reindex" })
     @RequestMapping(method = RequestMethod.GET, value = "/abort/{uuid}")
     public Mono<String> abort(@PathVariable String uuid) {

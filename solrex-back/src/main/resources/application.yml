@@ -1,10 +1,6 @@
 spring:
   application:
     name: solrex-back
-reindexer:
-  dataimport-rh: /dih
-  networking:
-    nat: true
 server:
   port: 8081
 logging:
