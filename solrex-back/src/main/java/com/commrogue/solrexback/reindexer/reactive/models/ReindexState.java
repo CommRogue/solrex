@@ -33,4 +33,12 @@ public class ReindexState
                                         slice -> getLeaderUrlForShardSlice(slice, isNatNetworking),
                                         slice -> new DataImportRequestState())))));
     }
+
+    public long getSumImportedDocuments() {
+        return this.values().stream()
+                .mapToLong(sourceMap -> sourceMap.values().stream()
+                        .mapToLong(DataImportRequestState::getIndexed)
+                        .sum())
+                .sum();
+    }
 }

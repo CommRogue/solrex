@@ -1,3 +1,5 @@
+job-manager:
+  max-cached-jobs: 100
 solr:
   networking-mode: "legacy"
   envs:
@@ -8,10 +10,10 @@ spring:
     name: solrex-back
 server:
   port: 8081
-logging:
-  level:
-    root: info
 springdoc:
   default-property-example: false
   swagger-ui:
     use-root-path: true
+logging:
+  level:
+    root: info

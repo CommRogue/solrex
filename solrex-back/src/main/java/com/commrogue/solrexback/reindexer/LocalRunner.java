@@ -36,7 +36,7 @@ public class LocalRunner implements ApplicationRunner {
                 .build();
 
         Disposable disposable =
-                reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
+                reindexJob.start().subscribeOn(Schedulers.boundedElastic()).subscribe();
 
         Thread.sleep(5000);
 
