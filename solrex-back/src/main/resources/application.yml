@@ -1,3 +1,9 @@
+solr:
+  envs:
+    - name: "dest"
+      zkConnectionString: "localhost:2182"
+    - name: "src"
+      zkConnectionString: "localhost:2181"
 spring:
   application:
     name: solrex-back
