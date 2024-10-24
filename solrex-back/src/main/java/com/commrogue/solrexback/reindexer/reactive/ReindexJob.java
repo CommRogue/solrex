@@ -2,18 +2,17 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
 import static com.commrogue.solrexback.reindexer.helpers.SolrHelpers.getCloudSolrClientFromZk;
+import static com.commrogue.solrexback.reindexer.web.models.ReindexSpecification.StageOrdering;
 
 import com.commrogue.solrexback.common.Collection;
 import com.commrogue.solrexback.common.web.jobmanager.StatefulJob;
 import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
+import com.commrogue.solrexback.reindexer.web.models.ReindexStageSpecification;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.Optional;
-import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -39,6 +38,9 @@ public class ReindexJob implements StatefulJob {
     private final int stagingAmount;
     private final String srcDiRequestHandler;
     private final String dstDiRequestHandler;
+    private final List<ReindexStageSpecification> reindexStageSpecifications;
+    private StageOrdering stageOrdering = StageOrdering.PRIORITIZE_STAGES;
+
     // boxed in order to check for nullability, and if so, delegate default values to be specified by Reindex
     private final Boolean isNatNetworking;
     private final Boolean commit;
@@ -62,7 +64,9 @@ public class ReindexJob implements StatefulJob {
             String srcDiRequestHandler,
             String dstDiRequestHandler,
             Boolean isNatNetworking,
-            Boolean commit) {
+            Boolean commit,
+            List<ReindexStageSpecification> reindexStageSpecifications,
+            StageOrdering stageOrdering) {
         this.timestampField = timestampField;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -73,6 +77,8 @@ public class ReindexJob implements StatefulJob {
         this.dstDiRequestHandler = dstDiRequestHandler;
         this.isNatNetworking = isNatNetworking;
         this.commit = commit;
+        this.reindexStageSpecifications = reindexStageSpecifications;
+        this.stageOrdering = stageOrdering;
     }
 
     public ReindexJob(ReindexSpecification reindexSpecification) {
@@ -81,11 +87,13 @@ public class ReindexJob implements StatefulJob {
         this.endDate = reindexSpecification.getEndDate();
         this.srcCollection = reindexSpecification.getSrcCollection();
         this.dstCollection = reindexSpecification.getDstCollection();
-        this.stagingAmount = reindexSpecification.getStagingAmount();
+        this.stagingAmount = reindexSpecification.getTimeRangeSplitAmount();
         this.srcDiRequestHandler = reindexSpecification.getSrcDiRequestHandler();
         this.dstDiRequestHandler = reindexSpecification.getDstDiRequestHandler();
         this.isNatNetworking = reindexSpecification.getIsNatNetworking();
         this.commit = reindexSpecification.getShouldCommit();
+        this.reindexStageSpecifications = reindexSpecification.getStages();
+        this.stageOrdering = reindexSpecification.getStageOrdering();
     }
 
     public Queue<Reindex> generateStages() {

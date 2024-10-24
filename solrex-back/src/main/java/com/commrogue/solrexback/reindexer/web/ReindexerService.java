@@ -15,9 +15,7 @@ public class ReindexerService {
     private final JobManager jobManager;
 
     public UUID reindex(ReindexSpecification reindexSpecification) {
-        UUID jobId = jobManager.registerJob(
-            new ReindexJob(reindexSpecification)
-        );
+        UUID jobId = jobManager.registerJob(new ReindexJob(reindexSpecification));
         jobManager.getJob(jobId).start();
 
         return jobId;

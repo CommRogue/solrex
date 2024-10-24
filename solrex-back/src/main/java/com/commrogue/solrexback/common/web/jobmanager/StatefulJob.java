@@ -26,14 +26,13 @@ public interface StatefulJob {
 
     default Optional<String> getSummary() {
         String summary = Stream.of(
-            Optional.of(getState()).map(s -> "State: " + s.name()),
-            getTitle().map(t -> "Title: " + t),
-            getDescription().map(d -> "Description: " + d),
-            getStateDescription().map(sd -> "State description: " + sd)
-        )
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .collect(Collectors.joining("\n"));
+                        Optional.of(getState()).map(s -> "State: " + s.name()),
+                        getTitle().map(t -> "Title: " + t),
+                        getDescription().map(d -> "Description: " + d),
+                        getStateDescription().map(sd -> "State description: " + sd))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.joining("\n"));
 
         return !summary.isBlank() ? Optional.empty() : Optional.of(summary);
     }

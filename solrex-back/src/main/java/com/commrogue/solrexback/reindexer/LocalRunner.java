@@ -6,7 +6,6 @@ import com.commrogue.solrexback.reindexer.reactive.ReindexJob;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -22,20 +21,18 @@ public class LocalRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         ReindexJob reindexJob = ReindexJob.builder()
-            .withTimestampField("bank_date")
-            .withStartDate(LocalDateTime.of(2024, 1, 1, 0, 0, 0))
-            .withEndDate(LocalDateTime.of(2024, 1, 2, 0, 0, 0))
-            .withSrcCollection(new Collection("localhost:2181", "xax"))
-            .withDstCollection(new Collection("localhost:2182", "products"))
-            .withStagingAmount(5)
-            .withSrcDiRequestHandler("diRequestHandler")
-            .withIsNatNetworking(true)
-            .build();
+                .withTimestampField("bank_date")
+                .withStartDate(LocalDateTime.of(2024, 1, 1, 0, 0, 0))
+                .withEndDate(LocalDateTime.of(2024, 1, 2, 0, 0, 0))
+                .withSrcCollection(new Collection("localhost:2181", "xax"))
+                .withDstCollection(new Collection("localhost:2182", "products"))
+                .withStagingAmount(5)
+                .withSrcDiRequestHandler("diRequestHandler")
+                .withIsNatNetworking(true)
+                .build();
 
-        Disposable disposable = reindexJob
-            .run()
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe();
+        Disposable disposable =
+                reindexJob.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
 
         Thread.sleep(5000);
 

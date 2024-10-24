@@ -1,9 +1,9 @@
+/* (C)Team Eclipse 2024 */
 package com.commrogue.solrexback.reindexer.reactive.models;
-
-import lombok.Data;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Data
 public class DataImportRequestState {
@@ -12,8 +12,9 @@ public class DataImportRequestState {
     long indexed;
 
     public Double getIndexingRate() {
-        return (indexed /
-                (double) Duration.between(started, finished != null ? finished : LocalDateTime.now()).toMillis()) *
-                1000;
+        return (indexed
+                        / (double) Duration.between(started, finished != null ? finished : LocalDateTime.now())
+                                .toMillis())
+                * 1000;
     }
 }
