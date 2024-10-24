@@ -2,6 +2,8 @@
 package com.commrogue.solrexback.reindexer.web;
 
 import com.commrogue.solrexback.common.web.jobmanager.JobManager;
+import com.commrogue.solrexback.common.web.jobmanager.StatefulJob;
+import com.commrogue.solrexback.reindexer.reactive.ReindexJob;
 import com.commrogue.solrexback.reindexer.web.models.BaseReindexSpecification;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,7 +11,9 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +25,8 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/reindex")
 public class ReindexerController {
 
-    private final ReindexerService reindexerService;
     private final JobManager jobManager;
+    private final Function<String, CloudSolrClient> cloudSolrClientFactory;
 
     /**
      * Simplified schema version of POST /reindex.
@@ -93,35 +97,10 @@ public class ReindexerController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Specified end date must be after start date");
         }
 
-        UUID reindexUUID = this.reindexerService.reindex(reindexSpecification);
+        UUID reindexUUID =
+                jobManager.registerJob(ReindexJob.fromSpecification(reindexSpecification, cloudSolrClientFactory));
+        jobManager.getJob(reindexUUID).ifPresent(StatefulJob::start);
 
         return Mono.just(reindexUUID.toString());
-    }
-
-    /**
-     * Retrieves the status of a reindex job identified by the provided UUID.
-     *
-     * @param uuid The UUID of the reindex job to check the status for.
-     * @return A Mono containing the string representation of the current state of the reindex job.
-     */
-    @Operation(tags = {"Reindex"})
-    @RequestMapping(method = RequestMethod.GET, value = "/status/{uuid}")
-    public Mono<String> checkStatus(@PathVariable String uuid) {
-        return Mono.just(
-                this.jobManager.getJob(UUID.fromString(uuid)).getState().toString());
-    }
-
-    /**
-     * Aborts the reindex job identified by the provided UUID.
-     *
-     * @param uuid The UUID of the reindex job to abort.
-     * @return A Mono containing a message indicating the job has been aborted.
-     */
-    @Operation(tags = {"Reindex"})
-    @RequestMapping(method = RequestMethod.GET, value = "/abort/{uuid}")
-    public Mono<String> abort(@PathVariable String uuid) {
-        this.jobManager.getJob(UUID.fromString(uuid)).terminate();
-
-        return Mono.just("Aborted %s".formatted(uuid));
     }
 }

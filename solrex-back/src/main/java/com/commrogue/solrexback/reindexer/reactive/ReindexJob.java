@@ -6,7 +6,8 @@ import static com.commrogue.solrexback.reindexer.reactive.Reindex.*;
 import static com.commrogue.solrexback.reindexer.web.models.ReindexSpecification.StageOrdering;
 
 import com.commrogue.solrexback.common.Collection;
-import com.commrogue.solrexback.common.web.jobmanager.StatefulJob;
+import com.commrogue.solrexback.common.web.jobmanager.Job;
+import com.commrogue.solrexback.reindexer.reactive.models.ReindexState;
 import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import com.commrogue.solrexback.reindexer.web.models.ReindexStageSpecification;
@@ -19,27 +20,31 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 @Valid
 @Slf4j
 @Getter
-public class ReindexJob implements StatefulJob {
+@Builder(setterPrefix = "with")
+@AllArgsConstructor
+public class ReindexJob implements Job {
     private final Function<String, CloudSolrClient> solrClientProvider;
     private final String timestampField;
     private final LocalDateTime startDate;
     private final LocalDateTime endDate;
     private final Collection srcCollection;
     private final Collection dstCollection;
-    private final int timeRangeSplitAmount;
+
+    @Builder.Default
+    private final int timeRangeSplitAmount = 1;
+
     private final String srcDiRequestHandler;
     private final String dstDiRequestHandler;
     private final List<ReindexStageSpecification> reindexStageSpecifications;
@@ -54,65 +59,32 @@ public class ReindexJob implements StatefulJob {
     @Getter(lazy = true)
     private final Queue<Reindex> remainingReindexes = generateReindexes();
 
-    private Disposable jobDisposable;
-    private boolean finished;
-
-    @Builder(setterPrefix = "with")
-    private ReindexJob(
-            String timestampField,
-            LocalDateTime startDate,
-            LocalDateTime endDate,
-            Collection srcCollection,
-            Collection dstCollection,
-            Integer timeRangeSplitAmount,
-            String srcDiRequestHandler,
-            String dstDiRequestHandler,
-            Boolean isNatNetworking,
-            Boolean commit,
-            List<ReindexStageSpecification> reindexStageSpecifications,
-            StageOrdering stageOrdering,
-            Function<String, CloudSolrClient> solrClientProvider) {
-        if (timeRangeSplitAmount == null) {
-            this.timeRangeSplitAmount = 1;
-        } else if (timeRangeSplitAmount < 1) {
-            throw new IllegalArgumentException("timeRangeSplitAmount must be positive if given");
-        } else {
-            this.timeRangeSplitAmount = timeRangeSplitAmount;
-        }
-
-        this.timestampField = timestampField;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.srcCollection = srcCollection;
-        this.dstCollection = dstCollection;
-        this.srcDiRequestHandler = srcDiRequestHandler;
-        this.dstDiRequestHandler = dstDiRequestHandler;
-        this.isNatNetworking = isNatNetworking;
-        this.commit = commit;
-        this.reindexStageSpecifications = reindexStageSpecifications;
-        this.stageOrdering = stageOrdering;
-        this.solrClientProvider = solrClientProvider;
-    }
+    private final List<Reindex> completedReindexes = new ArrayList<>();
 
     public static ReindexJobBuilder builder(Function<String, CloudSolrClient> solrClientProvider) {
         return new ReindexJobBuilder().withSolrClientProvider(solrClientProvider);
     }
 
-    public ReindexJob(ReindexSpecification reindexSpecification, Function<String, CloudSolrClient> solrClientProvider) {
-        this(
-                reindexSpecification.getTimestampField(),
-                reindexSpecification.getStartDate(),
-                reindexSpecification.getEndDate(),
-                reindexSpecification.getSrcCollection(),
-                reindexSpecification.getDstCollection(),
-                reindexSpecification.getTimeRangeSplitAmount(),
-                reindexSpecification.getSrcDiRequestHandler(),
-                reindexSpecification.getDstDiRequestHandler(),
-                reindexSpecification.getIsNatNetworking(),
-                reindexSpecification.getShouldCommit(),
-                reindexSpecification.getStages(),
-                reindexSpecification.getStageOrdering(),
-                solrClientProvider);
+    public static ReindexJob fromSpecification(
+            ReindexSpecification reindexSpecification, Function<String, CloudSolrClient> solrClientProvider) {
+        ReindexJobBuilder builder = ReindexJob.builder(solrClientProvider)
+                .withTimestampField(reindexSpecification.getTimestampField())
+                .withStartDate(reindexSpecification.getStartDate())
+                .withEndDate(reindexSpecification.getEndDate())
+                .withSrcCollection(reindexSpecification.getSrcCollection())
+                .withDstCollection(reindexSpecification.getDstCollection())
+                .withSrcDiRequestHandler(reindexSpecification.getSrcDiRequestHandler())
+                .withDstDiRequestHandler(reindexSpecification.getDstDiRequestHandler())
+                .withTimeRangeSplitAmount(reindexSpecification.getTimeRangeSplitAmount())
+                .withStageOrdering(reindexSpecification.getStageOrdering())
+                .withIsNatNetworking(reindexSpecification.getIsNatNetworking())
+                .withCommit(reindexSpecification.getShouldCommit());
+
+        if (reindexSpecification.getTimeRangeSplitAmount() != null) {
+            builder.withTimeRangeSplitAmount(reindexSpecification.getTimeRangeSplitAmount());
+        }
+
+        return builder.build();
     }
 
     // TODO - absolute garbage code
@@ -177,54 +149,34 @@ public class ReindexJob implements StatefulJob {
                         }));
     }
 
-    public Mono<Void> run() {
+    public long getSumIndexed() {
+        return Stream.concat(this.completedReindexes.stream(), Stream.of(this.currentReindex.get()))
+                .map(Reindex::getReindexState)
+                .mapToLong(ReindexState::getSumImportedDocuments)
+                .sum();
+    }
+
+    @Override
+    public Mono<String> start() {
         return Flux.<Reindex>generate(sink -> {
                     Reindex stage = this.getRemainingReindexes().poll();
                     this.currentReindex.set(stage);
                     if (stage == null) {
-                        this.currentReindex.set(null);
                         sink.complete();
                     } else {
                         sink.next(stage);
                     }
                 })
-                .concatMap(stage -> stage.getSubscribable().thenReturn(stage))
-                .doOnNext(x -> {
+                .concatMap(reindex -> reindex.getSubscribable().thenReturn(reindex))
+                .doOnNext(completedReindex -> {
                     log.atInfo()
-                            .addKeyValue("timestamp", x.getStartTime())
+                            .addKeyValue("timestamp", completedReindex.getStartTime())
                             .setMessage("Reindex complete")
                             .log();
-                    this.finished = true;
+
+                    completedReindexes.add(completedReindex);
                 })
-                .then();
-    }
-
-    @Override
-    public State getState() {
-        if (finished) {
-            return State.FINISHED;
-        }
-
-        if (this.jobDisposable == null) {
-            return State.AWAITING;
-        } else {
-            if (this.jobDisposable.isDisposed()) {
-                return State.TERMINATED;
-            } else {
-                return State.RUNNING;
-            }
-        }
-    }
-
-    @Override
-    public void terminate() {
-        if (this.jobDisposable != null) {
-            this.jobDisposable.dispose();
-        }
-    }
-
-    @Override
-    public void start() {
-        this.jobDisposable = this.run().subscribeOn(Schedulers.boundedElastic()).subscribe();
+                .then(Mono.just("Reindex job complete. \nTotal reindex stages: %s\nTotal documents imported: %s"
+                        .formatted(this.completedReindexes.size(), this.getSumIndexed())));
     }
 }
