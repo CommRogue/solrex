@@ -1,9 +1,8 @@
 solr:
+  networking-mode: "legacy"
   envs:
-    - name: "dest"
-      zkConnectionString: "localhost:2182"
-    - name: "src"
-      zkConnectionString: "localhost:2181"
+    dest: "localhost:2182"
+    src: "localhost:2181"
 spring:
   application:
     name: solrex-back
@@ -13,5 +12,6 @@ logging:
   level:
     root: info
 springdoc:
+  default-property-example: false
   swagger-ui:
     use-root-path: true

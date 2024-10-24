@@ -12,6 +12,5 @@ public class ReindexStageSpecification {
     @Singular
     private final List<String> fqs;
 
-    @Singular
-    private final List<String> overrideParams;
+    private final Boolean shouldCommitOverride;
 }

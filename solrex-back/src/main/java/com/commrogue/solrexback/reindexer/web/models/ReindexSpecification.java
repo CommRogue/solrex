@@ -1,17 +1,16 @@
 /* (C)Team Eclipse 2024 */
 package com.commrogue.solrexback.reindexer.web.models;
 
-import com.commrogue.solrexback.common.Collection;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
 import java.util.List;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Schema(description = "Reindex configuration")
-@Builder(setterPrefix = "with")
-@Data
-public class ReindexSpecification {
+@SuperBuilder(setterPrefix = "with")
+@Getter
+public class ReindexSpecification extends BaseReindexSpecification {
     @RequiredArgsConstructor
     @Getter(onMethod_ = @__(@JsonValue))
     public enum StageOrdering {
@@ -20,13 +19,11 @@ public class ReindexSpecification {
         private final String alias;
     }
 
-    @NonNull private final Collection srcCollection;
-
-    @NonNull private final Collection dstCollection;
-
+    @Schema(
+            description =
+                    "Target timestamp field in imported documents. Required if startDate or endDate are specified.")
     private final String timestampField;
-    private final LocalDateTime startDate;
-    private final LocalDateTime endDate;
+
     private final Integer timeRangeSplitAmount;
     private final String srcDiRequestHandler;
     private final String dstDiRequestHandler;

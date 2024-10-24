@@ -2,6 +2,7 @@
 package com.commrogue.solrexback.reindexer.reactive;
 
 import static com.commrogue.solrexback.reindexer.helpers.SolrHelpers.getCloudSolrClientFromZk;
+import static com.commrogue.solrexback.reindexer.reactive.Reindex.*;
 import static com.commrogue.solrexback.reindexer.web.models.ReindexSpecification.StageOrdering;
 
 import com.commrogue.solrexback.common.Collection;
@@ -14,11 +15,14 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -29,26 +33,26 @@ import reactor.core.scheduler.Schedulers;
 @Slf4j
 @Getter
 public class ReindexJob implements StatefulJob {
-
-    private String timestampField;
+    private final Function<String, CloudSolrClient> solrClientProvider;
+    private final String timestampField;
     private final LocalDateTime startDate;
     private final LocalDateTime endDate;
     private final Collection srcCollection;
     private final Collection dstCollection;
-    private final int stagingAmount;
+    private final int timeRangeSplitAmount;
     private final String srcDiRequestHandler;
     private final String dstDiRequestHandler;
     private final List<ReindexStageSpecification> reindexStageSpecifications;
-    private StageOrdering stageOrdering = StageOrdering.PRIORITIZE_STAGES;
+    private final StageOrdering stageOrdering;
 
     // boxed in order to check for nullability, and if so, delegate default values to be specified by Reindex
     private final Boolean isNatNetworking;
     private final Boolean commit;
 
-    private final AtomicReference<Reindex> currentStage = new AtomicReference<>();
+    private final AtomicReference<Reindex> currentReindex = new AtomicReference<>();
 
     @Getter(lazy = true)
-    private final Queue<Reindex> remainingStages = generateStages();
+    private final Queue<Reindex> remainingReindexes = generateReindexes();
 
     private Disposable jobDisposable;
     private boolean finished;
@@ -60,43 +64,75 @@ public class ReindexJob implements StatefulJob {
             LocalDateTime endDate,
             Collection srcCollection,
             Collection dstCollection,
-            int stagingAmount,
+            Integer timeRangeSplitAmount,
             String srcDiRequestHandler,
             String dstDiRequestHandler,
             Boolean isNatNetworking,
             Boolean commit,
             List<ReindexStageSpecification> reindexStageSpecifications,
-            StageOrdering stageOrdering) {
+            StageOrdering stageOrdering,
+            Function<String, CloudSolrClient> solrClientProvider) {
+        if (timeRangeSplitAmount == null) {
+            this.timeRangeSplitAmount = 1;
+        } else if (timeRangeSplitAmount < 1) {
+            throw new IllegalArgumentException("timeRangeSplitAmount must be positive if given");
+        } else {
+            this.timeRangeSplitAmount = timeRangeSplitAmount;
+        }
+
         this.timestampField = timestampField;
         this.startDate = startDate;
         this.endDate = endDate;
         this.srcCollection = srcCollection;
         this.dstCollection = dstCollection;
-        this.stagingAmount = stagingAmount;
         this.srcDiRequestHandler = srcDiRequestHandler;
         this.dstDiRequestHandler = dstDiRequestHandler;
         this.isNatNetworking = isNatNetworking;
         this.commit = commit;
         this.reindexStageSpecifications = reindexStageSpecifications;
         this.stageOrdering = stageOrdering;
+        this.solrClientProvider = solrClientProvider;
     }
 
-    public ReindexJob(ReindexSpecification reindexSpecification) {
-        this.timestampField = reindexSpecification.getTimestampField();
-        this.startDate = reindexSpecification.getStartDate();
-        this.endDate = reindexSpecification.getEndDate();
-        this.srcCollection = reindexSpecification.getSrcCollection();
-        this.dstCollection = reindexSpecification.getDstCollection();
-        this.stagingAmount = reindexSpecification.getTimeRangeSplitAmount();
-        this.srcDiRequestHandler = reindexSpecification.getSrcDiRequestHandler();
-        this.dstDiRequestHandler = reindexSpecification.getDstDiRequestHandler();
-        this.isNatNetworking = reindexSpecification.getIsNatNetworking();
-        this.commit = reindexSpecification.getShouldCommit();
-        this.reindexStageSpecifications = reindexSpecification.getStages();
-        this.stageOrdering = reindexSpecification.getStageOrdering();
+    public static ReindexJobBuilder builder(Function<String, CloudSolrClient> solrClientProvider) {
+        return new ReindexJobBuilder().withSolrClientProvider(solrClientProvider);
     }
 
-    public Queue<Reindex> generateStages() {
+    public ReindexJob(ReindexSpecification reindexSpecification, Function<String, CloudSolrClient> solrClientProvider) {
+        this(
+                reindexSpecification.getTimestampField(),
+                reindexSpecification.getStartDate(),
+                reindexSpecification.getEndDate(),
+                reindexSpecification.getSrcCollection(),
+                reindexSpecification.getDstCollection(),
+                reindexSpecification.getTimeRangeSplitAmount(),
+                reindexSpecification.getSrcDiRequestHandler(),
+                reindexSpecification.getDstDiRequestHandler(),
+                reindexSpecification.getIsNatNetworking(),
+                reindexSpecification.getShouldCommit(),
+                reindexSpecification.getStages(),
+                reindexSpecification.getStageOrdering(),
+                solrClientProvider);
+    }
+
+    // TODO - absolute garbage code
+    private Stream<Reindex> generateStages(ReindexBuilder baseReindexBuilder, boolean globalCommit) {
+        return reindexStageSpecifications.stream().map(stage -> {
+            baseReindexBuilder.withFqs(stage.getFqs());
+            if (stage.getShouldCommitOverride() != null) {
+                baseReindexBuilder.withCommit(stage.getShouldCommitOverride());
+            } else {
+                baseReindexBuilder.withCommit(globalCommit);
+            }
+
+            Reindex reindex = baseReindexBuilder.build();
+            baseReindexBuilder.clearFqs();
+
+            return reindex;
+        });
+    }
+
+    private Queue<Reindex> generateReindexes() {
         DocCollection sourceCollection = getCloudSolrClientFromZk(
                         this.getSrcCollection().getZkConnectionString())
                 .getClusterState()
@@ -107,11 +143,11 @@ public class ReindexJob implements StatefulJob {
                 .getCollection(this.getDstCollection().getCollectionName());
 
         Duration stageDuration =
-                Duration.between(this.getStartDate(), this.getEndDate()).dividedBy(this.getStagingAmount());
+                Duration.between(this.getStartDate(), this.getEndDate()).dividedBy(this.getTimeRangeSplitAmount());
 
-        return IntStream.range(0, this.getStagingAmount())
+        return IntStream.range(0, this.getTimeRangeSplitAmount())
                 .mapToObj(stageIndex -> {
-                    Reindex.ReindexBuilder builder = Reindex.builder(
+                    ReindexBuilder builder = Reindex.builder(
                                     sourceCollection,
                                     destinationCollection,
                                     NonLinearAutomaticSharding::getShardMapping)
@@ -123,18 +159,30 @@ public class ReindexJob implements StatefulJob {
                     Optional.ofNullable(this.getDstDiRequestHandler()).ifPresent(builder::withDstDiRequestHandler);
                     Optional.ofNullable(this.getCommit()).ifPresent(builder::withCommit);
 
-                    return builder.build();
+                    if (this.getReindexStageSpecifications() == null
+                            || !this.getReindexStageSpecifications().isEmpty()) {
+                        return Stream.of(builder.build());
+                    }
+
+                    return generateStages(builder, Boolean.TRUE.equals(this.getCommit()));
                 })
+                .flatMap(Function.identity())
                 .collect(Collectors.toCollection(
-                        () -> new PriorityQueue<>(Comparator.comparing(Reindex::getStartTime))));
+                        // TODO - when prioritizing time splits, stage order is not guaranteed to be maintained
+                        () -> {
+                            if (this.stageOrdering == StageOrdering.PRIORITIZE_TIME_SPLITS) {
+                                return new PriorityQueue<>(Comparator.comparing(Reindex::getStartTime));
+                            }
+                            return new LinkedList<>();
+                        }));
     }
 
     public Mono<Void> run() {
         return Flux.<Reindex>generate(sink -> {
-                    Reindex stage = this.getRemainingStages().poll();
-                    this.currentStage.set(stage);
+                    Reindex stage = this.getRemainingReindexes().poll();
+                    this.currentReindex.set(stage);
                     if (stage == null) {
-                        this.currentStage.set(null);
+                        this.currentReindex.set(null);
                         sink.complete();
                     } else {
                         sink.next(stage);

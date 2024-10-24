@@ -21,7 +21,9 @@ import reactor.core.publisher.Mono;
 @Slf4j
 public class Reindex {
 
-    private final String timestampField;
+    @Builder.Default
+    private final String timestampField = "timestamp";
+
     private final LocalDateTime startTime;
     private final LocalDateTime endTime;
 

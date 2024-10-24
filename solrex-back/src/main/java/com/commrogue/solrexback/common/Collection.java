@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class Collection {
     private final String collectionName;
+
     private final String zkConnectionString;
 
     // allow access to SolrProperties from static context, to allow @JsonCreator to access it
@@ -34,7 +35,6 @@ public class Collection {
             @JsonProperty(value = "collectionName", required = true) String collectionName,
             @JsonProperty("zkConnectionString") String zkConnectionString,
             @JsonProperty("env") String env) {
-
         if (env != null) {
             this.zkConnectionString = Optional.ofNullable(
                             SolrPropertiesProvider.solrProperties.getEnvs().get(env))

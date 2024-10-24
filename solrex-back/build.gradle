@@ -11,6 +11,7 @@ group = 'com.commrogue'
 version = '0.0.1-SNAPSHOT'
 
 spotless {
+	ratchetFrom('origin/main')
 	format 'misc', {
 		target '*.gradle', '.gitattributes', '.gitignore'
 		trimTrailingWhitespace()
@@ -41,7 +42,8 @@ afterEvaluate {
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(22)
+		// Kus Ima Shel Palantir Java, it doesn't work with Java 22
+		languageVersion = JavaLanguageVersion.of(17)
 	}
 }
 
