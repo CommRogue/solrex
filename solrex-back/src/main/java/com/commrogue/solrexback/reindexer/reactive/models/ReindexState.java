@@ -9,68 +9,28 @@ import java.util.stream.Collectors;
 import org.apache.solr.common.cloud.Slice;
 
 public class ReindexState
-    extends HashMap<
-        SolrCoreGatewayInformation,
-        Map<SolrCoreGatewayInformation, DataImportRequestState>
-    > {
+        extends HashMap<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> {
 
     private ReindexState(
-        Map<
-            SolrCoreGatewayInformation,
-            Map<SolrCoreGatewayInformation, DataImportRequestState>
-        > shardMapping
-    ) {
+            Map<SolrCoreGatewayInformation, Map<SolrCoreGatewayInformation, DataImportRequestState>> shardMapping) {
         super(shardMapping);
     }
 
-    private static SolrCoreGatewayInformation getLeaderUrlForShardSlice(
-        Slice shardSlice,
-        boolean isNatNetworking
-    ) {
+    private static SolrCoreGatewayInformation getLeaderUrlForShardSlice(Slice shardSlice, boolean isNatNetworking) {
         var coreUrl = shardSlice.getLeader().getCoreUrl();
 
         return new SolrCoreGatewayInformation(
-            coreUrl,
-            isNatNetworking
-                ? coreUrl.replaceFirst(
-                    "192\\.168\\.\\d+\\" + ".\\d+",
-                    "localhost"
-                )
-                : coreUrl
-        );
+                coreUrl, isNatNetworking ? coreUrl.replaceFirst("192\\.168\\.\\d+\\.\\d+", "localhost") : coreUrl);
     }
 
     public static ReindexState fromSliceMapping(
-        Map<Slice, ? extends Set<Slice>> shardMapping,
-        boolean isNatNetworking
-    ) {
-        return new ReindexState(
-            shardMapping
-                .entrySet()
-                .stream()
-                .collect(
-                    Collectors.toMap(
-                        entry ->
-                            getLeaderUrlForShardSlice(
-                                entry.getKey(),
-                                isNatNetworking
-                            ),
-                        entry ->
-                            entry
-                                .getValue()
-                                .stream()
-                                .collect(
-                                    Collectors.toMap(
-                                        e ->
-                                            getLeaderUrlForShardSlice(
-                                                e,
-                                                isNatNetworking
-                                            ),
-                                        _ -> new DataImportRequestState()
-                                    )
-                                )
-                    )
-                )
-        );
+            Map<Slice, ? extends Set<Slice>> shardMapping, boolean isNatNetworking) {
+        return new ReindexState(shardMapping.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> getLeaderUrlForShardSlice(entry.getKey(), isNatNetworking),
+                        entry -> entry.getValue().stream()
+                                .collect(Collectors.toMap(
+                                        slice -> getLeaderUrlForShardSlice(slice, isNatNetworking),
+                                        slice -> new DataImportRequestState())))));
     }
 }

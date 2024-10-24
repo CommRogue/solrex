@@ -20,6 +20,7 @@ import reactor.core.scheduler.Schedulers;
 @Slf4j
 @Builder(setterPrefix = "with")
 public class DataImportRequest {
+
     private final JavaAsyncSolrClient destinationClient;
     private final String sourceSolrUrl;
     private final String srcDiRequestHandler;
@@ -53,32 +54,21 @@ public class DataImportRequest {
     private static int extractNumIndexed(QueryResponse response) {
         try {
             return Integer.parseInt(
-                ((LinkedHashMap<String, String>) response
-                        .getResponse()
-                        .get("statusMessages")).get("Total Rows Fetched")
-            );
+                    ((LinkedHashMap<String, String>) response.getResponse().get("statusMessages"))
+                            .get("Total Rows Fetched"));
         } catch (NullPointerException e) {
             throw new InvalidResponseException(
-                "Unable to extract number of indexed documents from DataImport response. Verify" +
-                " that you are using the correct DataImport request handler",
-                e
-            );
+                    "Unable to extract number of indexed documents from DataImport response. Verify that you are using the correct DataImport request handler",
+                    e);
         }
     }
 
     @SuppressWarnings("unchecked")
     private static int extractStatusCode(QueryResponse response) {
         try {
-            return (
-                (SimpleOrderedMap<Integer>) (response
-                        .getResponse()
-                        .get("responseHeader"))
-            ).get("status");
+            return ((SimpleOrderedMap<Integer>) (response.getResponse().get("responseHeader"))).get("status");
         } catch (NullPointerException e) {
-            throw new InvalidResponseException(
-                "Unable to extract status code from DataImport response",
-                e
-            );
+            throw new InvalidResponseException("Unable to extract status code from DataImport response", e);
         }
     }
 
@@ -91,91 +81,51 @@ public class DataImportRequest {
         }
 
         throw new InvalidResponseException(
-            "Unable to extract status from DataImport response. Verify that you are using the" +
-            " correct DataImport request handler"
-        );
+                "Unable to extract status from DataImport response. Verify that you are using the correct DataImport request handler");
     }
 
-    public static DataImportRequestBuilder builder(
-        JavaAsyncSolrClient destinationClient,
-        String sourceSolrUrl
-    ) {
-        return new PostBuilder()
-            .withDestinationClient(destinationClient)
-            .withSourceSolrUrl(sourceSolrUrl);
+    public static DataImportRequestBuilder builder(JavaAsyncSolrClient destinationClient, String sourceSolrUrl) {
+        return new PostBuilder().withDestinationClient(destinationClient).withSourceSolrUrl(sourceSolrUrl);
     }
 
-    public static DataImportRequestBuilder builder(
-        String destinationSolrUrl,
-        String sourceSolrUrl
-    ) {
-        return builder(
-            JavaAsyncSolrClient.create(destinationSolrUrl),
-            sourceSolrUrl
-        );
+    public static DataImportRequestBuilder builder(String destinationSolrUrl, String sourceSolrUrl) {
+        return builder(JavaAsyncSolrClient.create(destinationSolrUrl), sourceSolrUrl);
     }
 
-    public static Mono<QueryResponse> makeRequestAndLog(
-        JavaAsyncSolrClient destinationClient,
-        SolrQuery request
-    ) {
-        log
-            .atInfo()
-            .addKeyValue("request", request)
-            .addKeyValue("destinationClient", destinationClient)
-            .setMessage("Sending SolrQuery")
-            .log();
+    public static Mono<QueryResponse> makeRequestAndLog(JavaAsyncSolrClient destinationClient, SolrQuery request) {
+        log.atInfo()
+                .addKeyValue("request", request)
+                .addKeyValue("destinationClient", destinationClient)
+                .setMessage("Sending SolrQuery")
+                .log();
 
         return Mono.fromCompletionStage(destinationClient.query(request));
     }
 
-    private Flux<Integer> observeShardReindex(
-        Mono<QueryResponse> statusObservable
-    ) {
+    private Flux<Integer> observeShardReindex(Mono<QueryResponse> statusObservable) {
         return statusObservable
-            .repeatWhen(status -> status.delayElements(Duration.ofSeconds(2)))
-            .takeUntil(response -> extractStatus(response).equals("idle"))
-            .map(DataImportRequest::extractNumIndexed);
+                .repeatWhen(status -> status.delayElements(Duration.ofSeconds(2)))
+                .takeUntil(response -> extractStatus(response).equals("idle"))
+                .map(DataImportRequest::extractNumIndexed);
     }
 
     public Flux<Integer> getSubscribable() {
-        return Mono.defer(() ->
-            makeRequestAndLog(destinationClient, statusRequest)
-                .map(DataImportRequest::extractStatus)
-                .doOnNext(status -> {
-                    if (status.equals("busy")) {
-                        throw new OngoingDataImportException(
-                            "A DataImport request is already in progress"
-                        );
-                    }
-                })
-                .then(
-                    Mono.defer(() -> {
-                        log.debug(
-                            "Sending DataImport request to {} - {}",
-                            this.sourceSolrUrl,
-                            dataImportRequest
-                        );
+        return Mono.defer(() -> makeRequestAndLog(destinationClient, statusRequest)
+                        .map(DataImportRequest::extractStatus)
+                        .doOnNext(status -> {
+                            if (status.equals("busy")) {
+                                throw new OngoingDataImportException("A DataImport request is already in progress");
+                            }
+                        })
+                        .then(Mono.defer(() -> {
+                            log.debug("Sending DataImport request to {} - {}", this.sourceSolrUrl, dataImportRequest);
 
-                        return makeRequestAndLog(
-                            destinationClient,
-                            dataImportRequest
-                        );
-                    })
-                )
-        )
-            .thenMany(
-                observeShardReindex(
-                    Mono.defer(() ->
-                        makeRequestAndLog(destinationClient, statusRequest)
-                    )
-                )
-            )
-            .doOnCancel(() ->
-                makeRequestAndLog(destinationClient, cancelRequest)
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe()
-            );
+                            return makeRequestAndLog(destinationClient, dataImportRequest);
+                        })))
+                .thenMany(observeShardReindex(Mono.defer(() -> makeRequestAndLog(destinationClient, statusRequest))))
+                .doOnCancel(() -> makeRequestAndLog(destinationClient, cancelRequest)
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .subscribe());
     }
 
     public static class PostBuilder extends DataImportRequestBuilder {

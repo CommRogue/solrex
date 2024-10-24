@@ -23,32 +23,23 @@ public class ReindexerController {
     private final JobManager jobManager;
 
     @Operation(
-        operationId = "reindex",
-        summary = "Reindex from source to target collections",
-        tags = { "Reindex" },
-        responses = {
-            @ApiResponse(
-                responseCode = "200",
-                description = "Started reindexing successfully",
-                content = {
-                    @Content(
-                        mediaType = "text/plain",
-                        schema = @Schema(implementation = String.class)
-                    ),
-                }
-            ),
-            @ApiResponse(
-                responseCode = "400",
-                description = "Bad request format",
-                content = {
-                    @Content(
-                        mediaType = "text/plain",
-                        schema = @Schema(implementation = String.class)
-                    ),
-                }
-            ),
-        }
-    )
+            operationId = "reindex",
+            summary = "Reindex from source to target collections",
+            tags = {"Reindex"},
+            responses = {
+                @ApiResponse(
+                        responseCode = "200",
+                        description = "Started reindexing successfully",
+                        content = {
+                            @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class)),
+                        }),
+                @ApiResponse(
+                        responseCode = "400",
+                        description = "Bad request format",
+                        content = {
+                            @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class)),
+                        }),
+            })
     /**
      * Initiates reindexing from a source to a target collection based on the provided reindex specification.
      * Validates the start and end dates in the specification.
@@ -59,18 +50,9 @@ public class ReindexerController {
      * @throws ResponseStatusException if the end date is not after the start date in the specification.
      */
     @RequestMapping(method = RequestMethod.POST, value = "/")
-    public Mono<String> reindex(
-        @RequestBody ReindexSpecification reindexSpecification
-    ) {
-        if (
-            !reindexSpecification
-                .getEndDate()
-                .isAfter(reindexSpecification.getStartDate())
-        ) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Specified end date must be after start date"
-            );
+    public Mono<String> reindex(@RequestBody ReindexSpecification reindexSpecification) {
+        if (!reindexSpecification.getEndDate().isAfter(reindexSpecification.getStartDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Specified end date must be after start date");
         }
 
         UUID reindexUUID = this.reindexerService.reindex(reindexSpecification);
@@ -84,24 +66,20 @@ public class ReindexerController {
      * @param uuid The UUID of the reindex job to check the status for.
      * @return A Mono containing the string representation of the current state of the reindex job.
      */
-    @Operation(tags = { "Reindex" })
+    @Operation(tags = {"Reindex"})
     @RequestMapping(method = RequestMethod.GET, value = "/status/{uuid}")
     public Mono<String> checkStatus(@PathVariable String uuid) {
         return Mono.just(
-            this.jobManager.getJob(UUID.fromString(uuid)).getState().toString()
-        );
+                this.jobManager.getJob(UUID.fromString(uuid)).getState().toString());
     }
 
-    /*
-     * Endpoint to initiate reindexing from a source to a target collection based on the provided reindex specification.
-     * Validates the start and end dates in the specification.
-     * Returns a Mono containing the UUID of the reindex job.
+    /**
+     * Aborts the reindex job identified by the provided UUID.
      *
-     * @param reindexSpecification The reindex specification containing details for the reindexing process.
-     * @return A Mono containing the UUID of the reindex job.
-     * @throws ResponseStatusException if the end date is not after the start date in the specification.
+     * @param uuid The UUID of the reindex job to abort.
+     * @return A Mono containing a message indicating the job has been aborted.
      */
-    @Operation(tags = { "Reindex" })
+    @Operation(tags = {"Reindex"})
     @RequestMapping(method = RequestMethod.GET, value = "/abort/{uuid}")
     public Mono<String> abort(@PathVariable String uuid) {
         this.jobManager.getJob(UUID.fromString(uuid)).terminate();
