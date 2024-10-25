@@ -3,9 +3,8 @@ package com.commrogue.solrexback.reindexer.web;
 
 import com.commrogue.solrexback.common.web.jobmanager.JobManager;
 import com.commrogue.solrexback.common.web.jobmanager.StatefulJob;
+import com.commrogue.solrexback.reindexer.reactive.BaseReindexJob;
 import com.commrogue.solrexback.reindexer.reactive.ReindexJob;
-import com.commrogue.solrexback.reindexer.web.models.BaseReindexSpecification;
-import com.commrogue.solrexback.reindexer.web.models.ReindexSpecification;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,7 +13,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -55,12 +53,13 @@ public class ReindexerController {
                         }),
             })
     @RequestMapping(method = RequestMethod.POST, value = "/simple")
-    public Mono<String> simplifiedSchemaReindex(@RequestBody BaseReindexSpecification reindexSpecification) {
-        ReindexSpecification explicitSpecification =
-                ReindexSpecification.builder().build();
-        BeanUtils.copyProperties(reindexSpecification, explicitSpecification);
-
-        return reindex(explicitSpecification);
+    public Mono<String> simplifiedSchemaReindex(@RequestBody BaseReindexJob reindexSpecification) {
+        return reindex(ReindexJob.builder()
+                .withSrcCollection(reindexSpecification.getSrcCollection())
+                .withDstCollection(reindexSpecification.getDstCollection())
+                .withStartDate(reindexSpecification.getStartDate())
+                .withEndDate(reindexSpecification.getEndDate())
+                .build());
     }
 
     /**
@@ -91,14 +90,13 @@ public class ReindexerController {
                         }),
             })
     @RequestMapping(method = RequestMethod.POST, value = "/")
-    public Mono<String> reindex(@RequestBody ReindexSpecification reindexSpecification) {
-        if ((reindexSpecification.getStartDate() != null && reindexSpecification.getEndDate() != null)
-                && !reindexSpecification.getEndDate().isAfter(reindexSpecification.getStartDate())) {
+    public Mono<String> reindex(@RequestBody ReindexJob reindexJob) {
+        if ((reindexJob.getStartDate() != null && reindexJob.getEndDate() != null)
+                && !reindexJob.getEndDate().isAfter(reindexJob.getStartDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Specified end date must be after start date");
         }
 
-        UUID reindexUUID =
-                jobManager.registerJob(ReindexJob.fromSpecification(reindexSpecification, cloudSolrClientFactory));
+        UUID reindexUUID = jobManager.registerJob(reindexJob);
         jobManager.getJob(reindexUUID).ifPresent(StatefulJob::start);
 
         return Mono.just(reindexUUID.toString());

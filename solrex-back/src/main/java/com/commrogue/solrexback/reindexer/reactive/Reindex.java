@@ -3,16 +3,14 @@ package com.commrogue.solrexback.reindexer.reactive;
 
 import com.commrogue.solrexback.reindexer.exceptions.OngoingDataImportException;
 import com.commrogue.solrexback.reindexer.reactive.models.ReindexState;
+import com.commrogue.solrexback.reindexer.reactive.sharding.NonLinearAutomaticSharding;
 import com.commrogue.solrexback.reindexer.reactive.sharding.ShardingStrategy;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Supplier;
+import javax.swing.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Slice;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -41,14 +39,15 @@ public class Reindex {
     @Builder.Default
     private final boolean commit = true;
 
-    public static AspectBuilder builder(
-            DocCollection source, DocCollection destination, ShardingStrategy shardingStrategy) {
-        return new AspectBuilder(() -> shardingStrategy.getShardMapping(source, destination));
+    public static AspectBuilder builder() {
+        return new AspectBuilder();
     }
 
-    public static AspectBuilder builderWithCustomSharding(Map<Slice, ? extends Set<Slice>> shardMapping) {
-        return new AspectBuilder(() -> shardMapping);
-    }
+    // TODO - either remove or find another way to implement this without having a parameterized AspectBuilder
+    // constructor
+    //    public static AspectBuilder builderWithCustomSharding(Map<Slice, ? extends Set<Slice>> shardMapping) {
+    //        return new AspectBuilder(() -> shardMapping);
+    //    }
 
     public Mono<Void> getSubscribable() {
         return Flux.fromIterable(reindexState.entrySet())
@@ -95,21 +94,35 @@ public class Reindex {
 
     public static class ReindexBuilder {
 
-        protected Supplier<Map<Slice, ? extends Set<Slice>>> shardMappingSupplier;
         protected boolean isNatNetworking = false;
+        protected DocCollection srcCollection;
+        protected DocCollection dstCollection;
+        protected ShardingStrategy shardingStrategy = NonLinearAutomaticSharding::getShardMapping;
 
+        // TODO - necessary?
         // protect @Builder's withReindexState, as it should not be used outside of Builder class
         protected ReindexBuilder withReindexState(ReindexState reindexState) {
             return null;
         }
 
-        public ReindexBuilder(Supplier<Map<Slice, ? extends Set<Slice>>> shardMappingSupplier) {
-            this.shardMappingSupplier = shardMappingSupplier;
-        }
-
         public ReindexBuilder withIsNatNetworking(boolean isNatNetworking) {
             this.isNatNetworking = isNatNetworking;
 
+            return this;
+        }
+
+        public ReindexBuilder withSrcCollection(DocCollection srcCollection) {
+            this.srcCollection = srcCollection;
+            return this;
+        }
+
+        public ReindexBuilder withDstCollection(DocCollection dstCollection) {
+            this.dstCollection = dstCollection;
+            return this;
+        }
+
+        public ReindexBuilder withShardingStrategy(ShardingStrategy shardingStrategy) {
+            this.shardingStrategy = shardingStrategy;
             return this;
         }
     }
@@ -118,14 +131,10 @@ public class Reindex {
     // TODO - what the fuck do I call this builder? it's not PostBuilder anymore because it is also
     // a PreBuilder...
     public static class AspectBuilder extends ReindexBuilder {
-
-        public AspectBuilder(Supplier<Map<Slice, ? extends Set<Slice>>> shardMappingSupplier) {
-            super(shardMappingSupplier);
-        }
-
         @Override
         public Reindex build() {
-            this.withReindexState(ReindexState.fromSliceMapping(this.shardMappingSupplier.get(), this.isNatNetworking));
+            this.withReindexState(ReindexState.fromSliceMapping(
+                    this.shardingStrategy.getShardMapping(this.srcCollection, dstCollection), this.isNatNetworking));
 
             Reindex reindex = super.build();
 

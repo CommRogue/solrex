@@ -12,9 +12,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SolrConfiguration {
+    @FunctionalInterface
+    public interface SolrCloudSupplier extends Function<String, CloudSolrClient> {}
+
     @Bean
     @ConditionalOnProperty(name = "solr.networking", havingValue = "legacy", matchIfMissing = true)
-    public Function<String, CloudSolrClient> getLegacyCloudSolrClient() {
+    public SolrCloudSupplier getLegacyCloudSolrClient() {
         return zkConnectionString -> new CloudLegacySolrClient.Builder(
                         Arrays.asList(zkConnectionString.split(",")), Optional.empty())
                 .build();
@@ -22,7 +25,7 @@ public class SolrConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "solr.networking", havingValue = "modern")
-    public Function<String, CloudSolrClient> getHttp2CloudSolrClient() {
+    public SolrCloudSupplier SolrCloudSuppliergetHttp2CloudSolrClient() {
         return zkConnectionString ->
                 new CloudSolrClient.Builder(Arrays.asList(zkConnectionString.split(",")), Optional.empty()).build();
     }
