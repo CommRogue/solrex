@@ -39,6 +39,9 @@ public class Reindex {
     @Builder.Default
     private final boolean commit = true;
 
+    @Builder.Default
+    private final int rowsPerBatch = 2000;
+
     public static AspectBuilder builder() {
         return new AspectBuilder();
     }

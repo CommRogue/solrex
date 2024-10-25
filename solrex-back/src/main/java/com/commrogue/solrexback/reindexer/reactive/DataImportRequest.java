@@ -85,7 +85,7 @@ public class DataImportRequest {
     }
 
     public static DataImportRequestBuilder builder(JavaAsyncSolrClient destinationClient, String sourceSolrUrl) {
-        return new PostBuilder().withDestinationClient(destinationClient).withSourceSolrUrl(sourceSolrUrl);
+        return new PreBuilder().withDestinationClient(destinationClient).withSourceSolrUrl(sourceSolrUrl);
     }
 
     public static DataImportRequestBuilder builder(String destinationSolrUrl, String sourceSolrUrl) {
@@ -128,8 +128,8 @@ public class DataImportRequest {
                         .subscribe());
     }
 
-    public static class PostBuilder extends DataImportRequestBuilder {
-
+    public static class PreBuilder extends DataImportRequestBuilder {
+        // TODO - implement here instead of init method. take a look at delomboked builder code for reference?
         @Override
         public DataImportRequest build() {
             DataImportRequest dataImportRequest = super.build();

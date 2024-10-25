@@ -13,4 +13,5 @@ public class ReindexStageSpecification {
     private final List<String> fqs;
 
     private final Boolean shouldCommitOverride;
+    private final Integer rowsPerBatchOverride;
 }

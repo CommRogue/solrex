@@ -58,6 +58,11 @@ public class ReindexJob extends BaseReindexJob implements Job {
             return this;
         }
 
+        public ReindexJobBuilder withGlobalRowsPerBatch(int globalRowsPerBatch) {
+            this.reindexBuilderTemplate.withRowsPerBatch(globalRowsPerBatch);
+            return this;
+        }
+
         public ReindexJobBuilder withTimestampField(String timestampField) {
             this.reindexBuilderTemplate.withTimestampField(timestampField);
             return this;
@@ -78,6 +83,10 @@ public class ReindexJob extends BaseReindexJob implements Job {
     @Builder.Default
     @JsonProperty("commit")
     private final boolean globalCommit = true;
+
+    @Builder.Default
+    @JsonProperty("rowsPerBatch")
+    private final int globalRowsPerBatch = 2000;
 
     @Builder.Default
     @Schema(defaultValue = "1")
@@ -112,9 +121,14 @@ public class ReindexJob extends BaseReindexJob implements Job {
                 baseReindexBuilder.withCommit(stage.getShouldCommitOverride());
             }
 
+            if (stage.getRowsPerBatchOverride() != null) {
+                baseReindexBuilder.withRowsPerBatch(stage.getRowsPerBatchOverride());
+            }
+
             Reindex reindex = baseReindexBuilder.build();
             baseReindexBuilder.clearFqs();
             baseReindexBuilder.withCommit(this.isGlobalCommit());
+            baseReindexBuilder.withRowsPerBatch(this.getGlobalRowsPerBatch());
 
             return reindex;
         });
@@ -126,10 +140,13 @@ public class ReindexJob extends BaseReindexJob implements Job {
 
         return IntStream.range(0, this.getTimeRangeSplitAmount())
                 .mapToObj(stageIndex -> {
+                    // TODO - why is this producing NullPointer? if OK, see workaround for not warning for this, since
+                    // it has @NonNull
                     reindexBuilderTemplate
                             .withStartTime(this.getStartDate().plus(stageDuration.multipliedBy(stageIndex)))
                             .withEndTime(this.getStartDate().plus(stageDuration.multipliedBy(stageIndex + 1)))
-                            .withCommit(this.isGlobalCommit());
+                            .withCommit(this.isGlobalCommit())
+                            .withRowsPerBatch(this.getGlobalRowsPerBatch());
 
                     if (this.getReindexStageSpecifications() == null
                             || !this.getReindexStageSpecifications().isEmpty()) {
