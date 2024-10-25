@@ -105,7 +105,6 @@ public class ReindexJob extends BaseReindexJob implements Job {
     @Schema(hidden = true)
     private final List<Reindex> completedReindexes = new ArrayList<>();
 
-    // TODO - absolute garbage code
     private Stream<Reindex> generateStages(ReindexBuilder baseReindexBuilder) {
         return reindexStageSpecifications.stream().map(stage -> {
             baseReindexBuilder.withFqs(stage.getFqs());

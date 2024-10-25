@@ -10,9 +10,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.UUID;
-import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,8 +22,6 @@ import reactor.core.publisher.Mono;
 public class ReindexerController {
 
     private final JobManager jobManager;
-    private final Function<String, CloudSolrClient> cloudSolrClientFactory;
-
     /**
      * Simplified schema version of POST /reindex.
      *
@@ -67,7 +63,7 @@ public class ReindexerController {
      * Validates the start and end dates in the specification.
      * Returns a Mono containing the UUID of the reindex job.
      *
-     * @param reindexSpecification The reindex specification containing details for the reindexing process.
+     * @param reindexJob The reindex specification containing details for the reindexing process.
      * @return A Mono containing the UUID of the reindex job.
      * @throws ResponseStatusException if the end date is not after the start date in the specification.
      */

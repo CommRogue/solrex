@@ -1,7 +1,8 @@
 /* (C)Team Eclipse 2024 */
 package com.commrogue.solrexback.reindexer.reactive;
 
-import com.commrogue.solrexback.common.web.deserializers.DocCollectionDeserializer;
+import static com.commrogue.solrexback.common.web.deserializers.DocCollectionDeserializerComponent.*;
+
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
