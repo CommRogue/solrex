@@ -5,7 +5,7 @@ import static com.commrogue.solrexback.reindexer.reactive.Reindex.*;
 
 import com.commrogue.solrexback.common.web.jobmanager.Job;
 import com.commrogue.solrexback.reindexer.reactive.models.ReindexState;
-import com.commrogue.solrexback.reindexer.reactive.sharding.ShardingStrategy;
+import com.commrogue.solrexback.reindexer.reactive.sharding.ShardingStrategies;
 import com.commrogue.solrexback.reindexer.web.models.ReindexStageSpecification;
 import com.commrogue.solrexback.reindexer.web.models.StageOrdering;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -39,37 +39,47 @@ public class ReindexJob extends BaseReindexJob implements Job {
         }
 
         public ReindexJobBuilder withIsNatNetworking(boolean isNatNetworking) {
+            this.isNatNetworking = isNatNetworking;
             this.reindexBuilderTemplate.withIsNatNetworking(isNatNetworking);
             return this;
         }
 
         public ReindexJobBuilder withSrcDiRequestHandler(String srcDiRequestHandler) {
+            this.srcDiRequestHandler = srcDiRequestHandler;
             this.reindexBuilderTemplate.withSrcDiRequestHandler(srcDiRequestHandler);
             return this;
         }
 
         public ReindexJobBuilder withDstDiRequestHandler(String dstDiRequestHandler) {
+            this.dstDiRequestHandler = dstDiRequestHandler;
             this.reindexBuilderTemplate.withDstDiRequestHandler(dstDiRequestHandler);
             return this;
         }
 
         public ReindexJobBuilder withGlobalCommit(boolean globalCommit) {
+            // TODO - works? if not, use boxed type for this and globalRowsPerBatch
+            this.globalCommit$set = true;
+            this.globalCommit$value = true;
             this.reindexBuilderTemplate.withCommit(globalCommit);
             return this;
         }
 
         public ReindexJobBuilder withGlobalRowsPerBatch(int globalRowsPerBatch) {
+            this.globalCommit$set = true;
+            this.globalRowsPerBatch$value = globalRowsPerBatch;
             this.reindexBuilderTemplate.withRowsPerBatch(globalRowsPerBatch);
             return this;
         }
 
         public ReindexJobBuilder withTimestampField(String timestampField) {
+            this.timestampField = timestampField;
             this.reindexBuilderTemplate.withTimestampField(timestampField);
             return this;
         }
 
-        public ReindexJobBuilder withShardingStrategy(ShardingStrategy shardingStrategy) {
-            this.reindexBuilderTemplate.withShardingStrategy(shardingStrategy);
+        public ReindexJobBuilder withShardingStrategy(ShardingStrategies shardingStrategy) {
+            this.shardingStrategy = shardingStrategy;
+            this.reindexBuilderTemplate.withShardingStrategy(shardingStrategy.getShardingStrategy());
             return this;
         }
     }
@@ -86,6 +96,7 @@ public class ReindexJob extends BaseReindexJob implements Job {
 
     @Builder.Default
     @JsonProperty("rowsPerBatch")
+    @Schema(example = "2000")
     private final int globalRowsPerBatch = 2000;
 
     @Builder.Default
@@ -97,6 +108,12 @@ public class ReindexJob extends BaseReindexJob implements Job {
 
     @Schema(defaultValue = "/dataimport")
     private final String dstDiRequestHandler;
+
+    @Schema(defaultValue = "false")
+    private final boolean isNatNetworking;
+
+    @Schema(defaultValue = "balanced")
+    private final ShardingStrategies shardingStrategy;
 
     @Singular
     @JsonProperty("stages")
