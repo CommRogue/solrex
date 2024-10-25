@@ -5,16 +5,15 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.PostConstruct;
 import java.util.*;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
+@RestController("/jobs")
 public class JobManager {
     private final JobManagerProperties jobManagerProperties;
 
@@ -74,5 +73,16 @@ public class JobManager {
         }
 
         return Mono.just("Aborted %s".formatted(uuid));
+    }
+
+    @Operation(tags = {"Jobs"})
+    @RequestMapping(method = RequestMethod.GET, value = "/all")
+    public Mono<String> getAll() {
+        return Mono.just(
+                this.jobs.isEmpty()
+                        ? "No jobs are currently running"
+                        : this.jobs.values().stream()
+                                .map(job -> job.getSummary().orElse("No job summary available."))
+                                .collect(Collectors.joining("\n")));
     }
 }

@@ -1,5 +1,5 @@
 /* (C)Team Eclipse 2024 */
-package com.commrogue.solrexback.common.web;
+package com.commrogue.solrexback.common.web.configuration;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
